@@ -1,0 +1,44 @@
+name: atms-dev
+services:
+  # [F03 검사] 공식 보안 패치 버전/다이제스트 고정. freshclam은 이 프로젝트 전용 서명 볼륨만 갱신한다.
+  clamav:
+    image: clamav/clamav:1.4.6_base@sha256:90effb795234e6a93b070310a4bab5a58d93d94b9a077a09ce2229947679782b
+    restart: unless-stopped
+    ports: ["127.0.0.1:13310:3310"]
+    environment: { TZ: UTC }
+    volumes: [clamav-signatures:/var/lib/clamav]
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 6
+      start_period: 180s
+  # [F01 추가] 개발 캡처 메일함. 릴레이/전달 없음, 외부 바인딩 없음, 공식 v1.31.4 이미지 고정.
+  mailpit:
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    mem_limit: 128m
+    # 파일 저장소/SMTP 릴레이를 설정하지 않아 캡처 메일은 이 개발 컨테이너에 한정된다.
+  postgres:
+    image: postgres:18.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: atms
+      POSTGRES_DB: atms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run env:init first}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atms -d atms"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 256m
+volumes:
+  postgres-data:
+  clamav-signatures:

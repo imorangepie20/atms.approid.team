@@ -1,0 +1,51 @@
+{
+  "name": "atms-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --env-file=.env --watch dist/main.js",
+    "start": "node --env-file=.env dist/main.js",
+    "start:container": "node dist/main.js",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json --watch",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "prisma db seed",
+    "check:db": "tsc --noEmit --strict --esModuleInterop --target ES2023 --module commonjs --moduleResolution node --skipLibCheck prisma/seed.ts prisma.config.ts",
+    "check:tests": "tsc -p tests/tsconfig.json",
+    "test": "npm run build && vitest run",
+    "test:evidence": "npm run build && vitest run tests/evidence-validation.test.ts tests/evidence-foundation.test.ts tests/evidence-storage.test.ts tests/database-foundation.test.ts tests/audit.test.ts --maxWorkers=1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1146.0",
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-express": "12.1.2",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "argon2": "0.45.1",
+    "busboy": "1.6.0",
+    "cookie-parser": "1.4.7",
+    "helmet": "^8.1.0",
+    "nodemailer": "10.0.14",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/busboy": "1.5.4",
+    "@types/cookie-parser": "1.4.10",
+    "@types/node": "^24.0.0",
+    "@types/nodemailer": "8.0.2",
+    "dotenv": "^17.0.0",
+    "prisma": "7.10.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

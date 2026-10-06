@@ -17,7 +17,7 @@ export default {
                         hover: 'var(--hud-bg-hover)',
                     },
                     accent: {
-                        primary: 'var(--hud-accent-primary)',
+                        primary: 'rgb(var(--hud-accent-rgb) / <alpha-value>)',
                         secondary: 'var(--hud-accent-secondary)',
                         warning: 'var(--hud-accent-warning)',
                         info: 'var(--hud-accent-info)',
@@ -26,6 +26,7 @@ export default {
                     },
                     text: {
                         primary: 'var(--hud-text-primary)',
+                        'on-accent': 'var(--hud-text-on-accent)',
                         secondary: 'var(--hud-text-secondary)',
                         muted: 'var(--hud-text-muted)',
                     },
@@ -36,7 +37,7 @@ export default {
                 }
             },
             fontFamily: {
-                sans: ['Inter', 'Roboto', 'system-ui', 'sans-serif'],
+                sans: ['Pretendard Variable', 'Pretendard', 'system-ui', 'sans-serif'],
                 mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
             },
             boxShadow: {

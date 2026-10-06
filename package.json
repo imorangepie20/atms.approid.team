@@ -7,29 +7,55 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:appearance": "node --test tests/appearance.test.cjs",
+    "env:init": "node infra/scripts/init-dev-env.mjs",
+    "dev:all": "node infra/scripts/dev.mjs",
+    "api:build": "npm --prefix server run build",
+    "api:dev": "npm --prefix server run dev",
+    "db:up": "docker compose --env-file infra/secrets/dev.env -f infra/compose.dev.yml up -d --wait",
+    "db:down": "docker compose --env-file infra/secrets/dev.env -f infra/compose.dev.yml down",
+    "db:deploy": "npm --prefix server run db:deploy",
+    "test:api": "npm --prefix server test",
+    "test:e2e": "playwright test",
+    "test": "npm run test:appearance && npm run test:api"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",
+    "@hookform/resolvers": "5.9.1",
+    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-table": "9.2.6",
     "chart.js": "^4.4.1",
+    "echarts": "6.1.0",
     "framer-motion": "^13.4.0",
     "lucide-react": "^0.344.0",
+    "pdfjs-dist": "6.4.299",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.0",
-    "recharts": "^2.12.0"
+    "react-hook-form": "7.89.0",
+    "react-router-dom": "7.18.4",
+    "recharts": "^2.12.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@testing-library/react": "16.3.3",
     "@types/node": "^25.0.8",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.18",
     "eslint": "^9.17.0",
+    "jsdom": "30.1.2",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "~5.6.2",
-    "vite": "^6.0.5"
+    "typescript-eslint": "^8.71.0",
+    "vite": "^6.0.5",
+    "vitest": "5.0.3"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

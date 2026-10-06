@@ -24,7 +24,7 @@ const Button = ({
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-hud disabled:opacity-50 disabled:cursor-not-allowed'
 
     const variants = {
-        primary: 'bg-hud-accent-primary text-hud-bg-primary hover:bg-hud-accent-primary/90',
+        primary: 'bg-hud-accent-primary text-hud-text-on-accent hover:bg-hud-accent-primary/90',
         secondary: 'bg-hud-accent-info text-white hover:bg-hud-accent-info/90',
         outline: 'border border-hud-accent-primary text-hud-accent-primary hover:bg-hud-accent-primary/10',
         ghost: 'text-hud-text-secondary hover:bg-hud-bg-hover hover:text-hud-text-primary',

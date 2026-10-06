@@ -1,0 +1,672 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// [기존 환경 모델 보존] 업무 스키마를 추가해도 이 모델과 첫 마이그레이션은 수정하지 않는다.
+model AppMetadata {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("app_metadata")
+}
+
+// [F08-11 추가] 회사 안에서 부여하는 5개 역할. 서비스 전체 운영자 권한은 별도 후속 설계다.
+enum CompanyRole {
+  COMPANY_ADMIN
+  ACCOUNTANT
+  APPROVER
+  READ_ONLY
+  EXTERNAL_TAX
+}
+
+// [F02 승인 C1] 거래처는 고객·공급·겸용 중 하나다. 역할/회계 계정과 구분한다.
+enum CounterpartyKind {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+// [F03 승인 E1/E5] 업무 분류와 업로드 상태를 구분한다. READY만 완료 증빙이다.
+enum EvidenceKind {
+  RECEIPT
+  TAX_INVOICE
+  OTHER
+}
+
+enum EvidenceUploadState {
+  PENDING
+  FAILED
+  READY
+  CLEANING
+  EXPIRED
+}
+
+// [F13-01~03 추가] 회계 규칙과 세무 규칙을 같은 버전 기반에서 구분한다.
+enum RuleDomain {
+  ACCOUNTING
+  TAX
+}
+
+// 설정·실행 코드·계정 매핑·출력 서식은 서로 독립된 버전을 가진다.
+enum RuleArtifactKind {
+  CONFIG
+  CALCULATION
+  ACCOUNT_MAPPING
+  FORM
+}
+
+// 회사는 데이터의 소유 경계다. 실제 HTTP 접근 통제는 F01·F08-13에서 연결한다.
+model Company {
+  id                String                   @id @default(uuid()) @db.Uuid
+  name              String
+  currency          String                   @default("KRW") @db.Char(3)
+  allowSelfApproval Boolean                  @default(false) @map("allow_self_approval")
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships       CompanyMembership[]
+  invitations       CompanyInvitation[]
+  accessRequests    CompanyAccessRequest[]
+  fiscalYears       FiscalYear[]
+  accounts          CompanyAccount[]
+  ruleApplications  CompanyRuleApplication[]
+  counterparties    Counterparty[]
+  evidences         Evidence[]
+  evidenceUploads   EvidenceUpload[]
+  // [F04 전표 초안 J7] 회사 경계를 모든 전표/번호/분개/증빙 연결의 복합 FK에 포함한다.
+  journals          JournalEntry[]
+  journalNumbers    JournalNumberSequence[]
+  journalPostings   JournalPosting[]
+  // [F01 세 번째 묶음] 버전은 오래된 수정 방지용. 기존 회사의 실제 생성자를 추정하지 않는다.
+  version           Int                      @default(1)
+  createdById       String?                  @map("created_by_id") @db.Uuid
+  creationRequestId String?                  @map("creation_request_id") @db.Uuid
+  creationInputHash String?                  @map("creation_input_hash") @db.Char(64)
+  createdBy         User?                    @relation("CompanyCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([createdById, creationRequestId])
+  @@map("companies")
+}
+
+// [F02 승인 C2~C6] 회사가 소유 경계이며 삭제 대신 active=false로 ID/과거 참조를 보존한다.
+// 생성 요청 해시는 최초 정규화 입력의 재전송 식별용이다. 응답·감사에는 내보내지 않는다.
+model Counterparty {
+  id                String           @id @default(uuid()) @db.Uuid
+  companyId         String           @map("company_id") @db.Uuid
+  name              String
+  kind              CounterpartyKind
+  businessNumber    String?          @map("business_number") @db.VarChar(10)
+  contactName       String?          @map("contact_name")
+  email             String?
+  phone             String?
+  address           String?
+  memo              String?
+  active            Boolean          @default(true)
+  version           Int              @default(1)
+  creationRequestId String           @map("creation_request_id") @db.Uuid
+  creationInputHash String           @map("creation_input_hash") @db.Char(64)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  company           Company          @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  evidences         Evidence[]
+  journals          JournalEntry[]
+
+  // PostgreSQL UNIQUE는 null 번호를 여러 개 허용한다. 중지된 번호도 계속 예약한다.
+  @@unique([companyId, businessNumber])
+  @@unique([companyId, creationRequestId])
+  @@unique([companyId, id])
+  @@map("counterparties")
+}
+
+// [F03 완료 원본] 회사+거래처/예약 FK와 RESTRICT로 과거 원본의 연결을 보존한다.
+// 저장 키/지문은 서버 내부 무결성 검사에만 사용하고 공개 view/감사에서 제외한다.
+model Evidence {
+  id               String            @id @default(uuid()) @db.Uuid
+  companyId        String            @map("company_id") @db.Uuid
+  uploadId         String            @map("upload_id") @db.Uuid
+  kind             EvidenceKind
+  title            String
+  occurredOn       DateTime?         @map("occurred_on") @db.Date
+  counterpartyId   String?           @map("counterparty_id") @db.Uuid
+  originalFileName String            @map("original_file_name")
+  mediaType        String            @map("media_type")
+  byteSize         Int               @map("byte_size")
+  sha256           String            @db.Char(64)
+  originalKey      String            @unique @map("original_key")
+  createdById      String            @map("created_by_id") @db.Uuid
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  counterparty     Counterparty?     @relation(fields: [companyId, counterpartyId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  upload           EvidenceUpload    @relation(fields: [companyId, uploadId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy        User              @relation("EvidenceCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  journalLinks     JournalEvidence[]
+
+  @@unique([companyId, id])
+  @@unique([companyId, uploadId])
+  @@map("evidences")
+}
+
+// [F03 미완성 추적] 외부 저장 작업 전에 각 시도 키를 attempts에 기록한다.
+// 만료 후에도 이 기록을 남겨 늦은 파일 생성을 조정하며 완료 원본은 정리하지 않는다.
+model EvidenceUpload {
+  id                String              @id @default(uuid()) @db.Uuid
+  companyId         String              @map("company_id") @db.Uuid
+  creationRequestId String              @map("creation_request_id") @db.Uuid
+  ownerId           String              @map("owner_id") @db.Uuid
+  inputHash         String              @map("input_hash") @db.Char(64)
+  state             EvidenceUploadState @default(PENDING)
+  attemptId         String              @map("attempt_id") @db.Uuid
+  attempts          Json                @default("[]")
+  failureCode       String?             @map("failure_code")
+  lastActivityAt    DateTime            @default(now()) @map("last_activity_at") @db.Timestamptz(3)
+  leaseExpiresAt    DateTime            @map("lease_expires_at") @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  company           Company             @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  owner             User                @relation("EvidenceUploadOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  evidence          Evidence?
+
+  @@unique([companyId, creationRequestId])
+  @@unique([companyId, id])
+  @@index([state, lastActivityAt])
+  @@map("evidence_uploads")
+}
+
+// 이메일 원문과 조회용 정규화 값을 분리한다. 활성 계정은 해시가 필요하며 개발 대역은 중지 상태다.
+model User {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  email                   String
+  emailNormalized         String                 @unique @map("email_normalized")
+  passwordHash            String?                @map("password_hash")
+  emailVerifiedAt         DateTime?              @map("email_verified_at") @db.Timestamptz(3)
+  disabledAt              DateTime?              @map("disabled_at") @db.Timestamptz(3)
+  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships             CompanyMembership[]
+  sessions                UserSession[]
+  actionTokens            UserActionToken[]
+  createdCompanies        Company[]              @relation("CompanyCreator")
+  createdEvidences        Evidence[]             @relation("EvidenceCreator")
+  evidenceUploads         EvidenceUpload[]       @relation("EvidenceUploadOwner")
+  createdJournals         JournalEntry[]         @relation("JournalCreator")
+  journalPostings         JournalPosting[]       @relation("JournalPostingActor")
+  // [F01 다섯 번째 묶음] 초대는 이메일에 보내므로 미가입 대상 User를 강제로 생성하지 않는다.
+  issuedInvitations       CompanyInvitation[]    @relation("InvitationIssuer")
+  accessRequests          CompanyAccessRequest[] @relation("AccessRequester")
+  processedAccessRequests CompanyAccessRequest[] @relation("AccessProcessor")
+
+  @@map("users")
+}
+
+model CompanyMembership {
+  id        String              @id @default(uuid()) @db.Uuid
+  companyId String              @map("company_id") @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  active    Boolean             @default(true)
+  // [F01 네 번째 묶음] 역할/소속 변경의 낙관적 버전. 회사 이름/기간의 Company.version과 독립적이다.
+  // 기존 소속은 1로 시작하고 과거 변경 횟수를 추정해 채우지 않는다.
+  version   Int                 @default(1)
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user      User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  roles     CompanyMemberRole[]
+
+  @@unique([companyId, userId])
+  // 역할의 회사와 소속의 회사를 복합 외래키로 일치시킨다.
+  @@unique([companyId, id])
+  @@index([userId])
+  @@map("company_memberships")
+}
+
+model CompanyMemberRole {
+  companyId    String            @map("company_id") @db.Uuid
+  membershipId String            @map("membership_id") @db.Uuid
+  role         CompanyRole
+  membership   CompanyMembership @relation(fields: [companyId, membershipId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([companyId, membershipId, role])
+  @@map("company_member_roles")
+}
+
+// 세션 식별자·CSRF 토큰의 원문은 저장하지 않는다. 만료 연장·식별자 재발급 로직은 후속 인증 단계다.
+model UserSession {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash") @db.Char(64)
+  csrfTokenHash     String?   @map("csrf_token_hash") @db.Char(64)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastActivityAt    DateTime  @map("last_activity_at") @db.Timestamptz(3)
+  idleExpiresAt     DateTime  @map("idle_expires_at") @db.Timestamptz(3)
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(3)
+  reauthenticatedAt DateTime? @map("reauthenticated_at") @db.Timestamptz(3)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(3)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, revokedAt])
+  @@index([absoluteExpiresAt])
+  @@map("user_sessions")
+}
+
+// 날짜는 시각과 구분한다. 날짜 역전과 같은 회사의 겹치는 기간은 마이그레이션 SQL에서도 막는다.
+model FiscalYear {
+  id             String                  @id @default(uuid()) @db.Uuid
+  companyId      String                  @map("company_id") @db.Uuid
+  startDate      DateTime                @map("start_date") @db.Date
+  endDate        DateTime                @map("end_date") @db.Date
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  journals       JournalEntry[]          @relation("JournalFiscalYear")
+  // [F04-02 O6] 다른 회계연도의 기초 잔액이 이 연도를 출처로 명시할 때만 연결된다.
+  openingSources JournalEntry[]          @relation("OpeningSourceFiscalYear")
+  numbers        JournalNumberSequence[]
+
+  @@unique([companyId, startDate])
+  @@unique([companyId, id])
+  @@map("fiscal_years")
+}
+
+// 회사 계정의 출처를 보존한다. 공식 목록·매핑 승인과 수정 금지는 F04·F13 기능에서 확장한다.
+model AccountTemplate {
+  id                String                @id @default(uuid()) @db.Uuid
+  code              String
+  version           Int
+  name              String
+  isDevelopmentOnly Boolean               @default(false) @map("is_development_only")
+  items             AccountTemplateItem[]
+
+  @@unique([code, version])
+  @@map("account_templates")
+}
+
+model AccountTemplateItem {
+  id         String           @id @default(uuid()) @db.Uuid
+  templateId String           @map("template_id") @db.Uuid
+  code       String
+  name       String
+  template   AccountTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  accounts   CompanyAccount[]
+
+  @@unique([templateId, code])
+  @@map("account_template_items")
+}
+
+// [F04-01 승인 A3/A4] 보고서 매핑과 별개인 계정 분류/정상 잔액 방향. 기존 계정은 추정하지 않는다.
+enum AccountCategory {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountNormalBalance {
+  DEBIT
+  CREDIT
+}
+
+model CompanyAccount {
+  id                   String                @id @default(uuid()) @db.Uuid
+  companyId            String                @map("company_id") @db.Uuid
+  code                 String
+  name                 String
+  active               Boolean               @default(true)
+  // [F04-01 A4/A6] 기존 행은 두 쌍이 null이고 version=1. 새 API는 분류/방향/요청 쌍을 필수 저장한다.
+  category             AccountCategory?
+  normalBalance        AccountNormalBalance? @map("normal_balance")
+  version              Int                   @default(1)
+  creationRequestId    String?               @map("creation_request_id") @db.Uuid
+  creationInputHash    String?               @map("creation_input_hash") @db.Char(64)
+  sourceTemplateItemId String?               @map("source_template_item_id") @db.Uuid
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourceTemplateItem   AccountTemplateItem?  @relation(fields: [sourceTemplateItemId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  journalLines         JournalLine[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, creationRequestId])
+  // 향후 전표·잔액의 외래키도 회사 ID를 포함해 연결한다.
+  @@unique([companyId, id])
+  @@map("company_accounts")
+}
+
+// [F04-02 O1] 일반 전표와 회계연도별 기초 잔액을 같은 승인 엔진 안에서 명시적으로 구분한다.
+enum JournalKind {
+  STANDARD
+  OPENING
+}
+
+// [F05 확정 기반] POSTED는 승인된 전표를 원장에 반영한 최종 상태다.
+enum JournalStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  POSTED
+}
+
+enum JournalWorkflowActionKind {
+  SUBMIT
+  APPROVE
+  REJECT
+  RETURN_TO_DRAFT
+  CONFIRM
+}
+
+// [F04 J2/J6/J7] 번호/회계연도/작성자는 최초 저장 후 불변이다. DATE는 업무일자,
+// timestamptz는 서버 처리 시각이다. 금액은 정확한 NUMERIC(24,6), 원 단위 제한은 입력/SQL CHECK로 지킨다.
+model JournalEntry {
+  id                        String                  @id @default(uuid()) @db.Uuid
+  companyId                 String                  @map("company_id") @db.Uuid
+  fiscalYearId              String                  @map("fiscal_year_id") @db.Uuid
+  kind                      JournalKind             @default(STANDARD)
+  openingSourceFiscalYearId String?                 @map("opening_source_fiscal_year_id") @db.Uuid
+  number                    String                  @db.VarChar(15)
+  accountingDate            DateTime                @map("accounting_date") @db.Date
+  memo                      String
+  currency                  String                  @default("KRW") @db.Char(3)
+  status                    JournalStatus           @default(DRAFT)
+  version                   Int                     @default(1)
+  counterpartyId            String?                 @map("counterparty_id") @db.Uuid
+  debitTotal                Decimal                 @map("debit_total") @db.Decimal(24, 6)
+  creditTotal               Decimal                 @map("credit_total") @db.Decimal(24, 6)
+  lineCount                 Int                     @map("line_count")
+  evidenceCount             Int                     @map("evidence_count")
+  createdById               String                  @map("created_by_id") @db.Uuid
+  creationRequestId         String                  @map("creation_request_id") @db.Uuid
+  creationInputHash         String                  @map("creation_input_hash") @db.Char(64)
+  createdAt                 DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  company                   Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  fiscalYear                FiscalYear              @relation("JournalFiscalYear", fields: [companyId, fiscalYearId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  openingSourceFiscalYear   FiscalYear?             @relation("OpeningSourceFiscalYear", fields: [companyId, openingSourceFiscalYearId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  counterparty              Counterparty?           @relation(fields: [companyId, counterpartyId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy                 User                    @relation("JournalCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  lines                     JournalLine[]
+  evidences                 JournalEvidence[]
+  submissions               JournalSubmission[]
+  workflowActions           JournalWorkflowAction[]
+  posting                   JournalPosting?
+
+  @@unique([companyId, id])
+  @@unique([companyId, number])
+  @@unique([companyId, creationRequestId])
+  @@index([companyId, accountingDate])
+  @@index([companyId, kind, fiscalYearId])
+  @@map("journal_entries")
+}
+
+// [F05 W4/W6] 제출 당시 내용을 회사·전표에 묶어 보존한다. 이후 초안 편집은 새 제출본을 만든다.
+model JournalSubmission {
+  id          String                  @id @default(uuid()) @db.Uuid
+  companyId   String                  @map("company_id") @db.Uuid
+  journalId   String                  @map("journal_id") @db.Uuid
+  content     Json                    @db.JsonB
+  createdById String                  @map("created_by_id") @db.Uuid
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  journal     JournalEntry            @relation(fields: [companyId, journalId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  actions     JournalWorkflowAction[]
+  posting     JournalPosting?
+
+  @@unique([companyId, id])
+  @@index([companyId, journalId, createdAt])
+  @@map("journal_submissions")
+}
+
+// [F05 W5/W6] 한 회사의 작업 ID는 한 전이 결과에만 대응한다. 이력은 수정·삭제하지 않는다.
+model JournalWorkflowAction {
+  id              String                    @id @default(uuid()) @db.Uuid
+  companyId       String                    @map("company_id") @db.Uuid
+  journalId       String                    @map("journal_id") @db.Uuid
+  submissionId    String                    @map("submission_id") @db.Uuid
+  actionRequestId String                    @map("action_request_id") @db.Uuid
+  action          JournalWorkflowActionKind
+  inputHash       String                    @map("input_hash") @db.Char(64)
+  statusBefore    JournalStatus             @map("status_before")
+  statusAfter     JournalStatus             @map("status_after")
+  versionBefore   Int                       @map("version_before")
+  versionAfter    Int                       @map("version_after")
+  actorId         String                    @map("actor_id") @db.Uuid
+  reason          String?
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  journal         JournalEntry              @relation(fields: [companyId, journalId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  submission      JournalSubmission         @relation(fields: [companyId, submissionId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  posting         JournalPosting?
+
+  @@unique([companyId, actionRequestId])
+  @@unique([companyId, id])
+  @@unique([companyId, journalId, versionAfter])
+  @@index([companyId, journalId, createdAt, id])
+  @@map("journal_workflow_actions")
+}
+
+// [F05-01/F04-08 확정 기반] 원장 반영 사실은 전표·승인 제출본·CONFIRM 이력과 같은 회사 경계로 묶는다.
+// 금액은 복사하지 않고 불변 journal_lines를 원장의 단일 원천으로 사용한다.
+model JournalPosting {
+  id           String                @id @default(uuid()) @db.Uuid
+  companyId    String                @map("company_id") @db.Uuid
+  journalId    String                @map("journal_id") @db.Uuid
+  submissionId String                @map("submission_id") @db.Uuid
+  actionId     String                @map("action_id") @db.Uuid
+  actorId      String                @map("actor_id") @db.Uuid
+  postedAt     DateTime              @map("posted_at") @db.Timestamptz(3)
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  journal      JournalEntry          @relation(fields: [companyId, journalId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  submission   JournalSubmission     @relation(fields: [companyId, submissionId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  action       JournalWorkflowAction @relation(fields: [companyId, actionId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  actor        User                  @relation("JournalPostingActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, journalId])
+  @@unique([companyId, submissionId])
+  @@unique([companyId, actionId])
+  @@index([companyId, postedAt])
+  @@map("journal_postings")
+}
+
+// [J3/J6] position은 입력 순서다. 전체 교체는 DRAFT의 분개만 대상으로 하며 확정 분개 수정 기능이 아니다.
+model JournalLine {
+  id        String         @id @default(uuid()) @db.Uuid
+  companyId String         @map("company_id") @db.Uuid
+  journalId String         @map("journal_id") @db.Uuid
+  position  Int
+  accountId String         @map("account_id") @db.Uuid
+  debit     Decimal        @db.Decimal(24, 6)
+  credit    Decimal        @db.Decimal(24, 6)
+  memo      String?
+  journal   JournalEntry   @relation(fields: [companyId, journalId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  account   CompanyAccount @relation(fields: [companyId, accountId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, journalId, position])
+  @@index([companyId, accountId])
+  @@map("journal_lines")
+}
+
+// [J4] 하나의 증빙에 여러 초안을 연결할 수 있다. 파일 원본이나 사용 금액을 복사하지 않는다.
+model JournalEvidence {
+  companyId  String       @map("company_id") @db.Uuid
+  journalId  String       @map("journal_id") @db.Uuid
+  evidenceId String       @map("evidence_id") @db.Uuid
+  journal    JournalEntry @relation(fields: [companyId, journalId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+  evidence   Evidence     @relation(fields: [companyId, evidenceId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([companyId, journalId, evidenceId])
+  @@index([companyId, evidenceId, journalId])
+  @@map("journal_evidences")
+}
+
+// [J2] 회사/회계연도별 마지막 발급 값. 회사 잠금 아래에서 저장/감사와 같은 TX로 증가한다.
+model JournalNumberSequence {
+  companyId    String     @map("company_id") @db.Uuid
+  fiscalYearId String     @map("fiscal_year_id") @db.Uuid
+  lastNumber   Int        @map("last_number")
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  fiscalYear   FiscalYear @relation(fields: [companyId, fiscalYearId], references: [companyId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([companyId, fiscalYearId])
+  @@map("journal_number_sequences")
+}
+
+// [F01/F08-13 추가] 해시화한 계정/IP 키별 최근 시도 시각. 원문 이메일/IP를 이 테이블에 중복 저장하지 않는다.
+// 배열은 15분 슬라이딩 창 검증용이며 advisory lock 안에서 갱신한다. 단순 누적 카운터로 경계를 바꾸지 않는다.
+model LoginRateBucket {
+  id           String     @id @db.Char(64)
+  attempts     DateTime[] @db.Timestamptz(3)
+  blockedUntil DateTime?  @map("blocked_until") @db.Timestamptz(3)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("login_rate_buckets")
+}
+
+// 감사 자료는 원문 자격 증명을 담지 않는다. 삭제 연쇄를 연결하지 않고 처리 당시 식별자를 보존한다.
+// details는 감사 서비스가 정적 허용 필드만 구성한다. 감사 조회/보존 정책의 관리 API는 후속 범위다.
+model AuditEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  requestId String   @map("request_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  type      String
+  details   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([companyId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_events")
+}
+
+// [F01 두 번째 묶음] 메일에서 전달한 원문은 저장하지 않는다. 두 용도를 구별해 확인 링크로 복구하지 못하게 한다.
+model UserActionToken {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  purpose       String
+  tokenHash     String    @unique @map("token_hash") @db.Char(64)
+  createdAt     DateTime  @map("created_at") @db.Timestamptz(3)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt        DateTime? @map("used_at") @db.Timestamptz(3)
+  invalidatedAt DateTime? @map("invalidated_at") @db.Timestamptz(3)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, purpose])
+  @@map("user_action_tokens")
+}
+
+// [F01 초대 추가] 원문 토큰은 메일에서만 전달하고 DB에는 SHA-256만 저장한다.
+// 문자열 상태의 허용값/시각/역할 배열과 PENDING 부분 유일성은 추가 SQL에서 검증한다.
+model CompanyInvitation {
+  id                 String        @id @default(uuid()) @db.Uuid
+  companyId          String        @map("company_id") @db.Uuid
+  email              String
+  emailNormalized    String        @map("email_normalized")
+  roles              CompanyRole[]
+  issuerId           String        @map("issuer_id") @db.Uuid
+  status             String        @default("PENDING")
+  version            Int           @default(1)
+  tokenHash          String        @unique @map("token_hash") @db.Char(64)
+  tokenInvalidatedAt DateTime?     @map("token_invalidated_at") @db.Timestamptz(3)
+  createdAt          DateTime      @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  expiresAt          DateTime      @map("expires_at") @db.Timestamptz(3)
+  processedAt        DateTime?     @map("processed_at") @db.Timestamptz(3)
+  company            Company       @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  issuer             User          @relation("InvitationIssuer", fields: [issuerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, id])
+  @@map("company_invitations")
+}
+
+// [F01 요청 추가] 역할 입력은 받지 않는다. 승인 시 EXTERNAL_TAX만 생성한다.
+model CompanyAccessRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  requesterId String    @map("requester_id") @db.Uuid
+  processorId String?   @map("processor_id") @db.Uuid
+  status      String    @default("PENDING")
+  version     Int       @default(1)
+  createdAt   DateTime  @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(3)
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requester   User      @relation("AccessRequester", fields: [requesterId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  processor   User?     @relation("AccessProcessor", fields: [processorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, id])
+  @@index([requesterId, id])
+  @@map("company_access_requests")
+}
+
+// [F13-01 추가] 규칙의 고정 식별자다. 실제 법률 값이나 계산식은 이 행에 넣지 않는다.
+model RuleSet {
+  id           String                   @id @default(uuid()) @db.Uuid
+  domain       RuleDomain
+  jurisdiction String                   @db.Char(2)
+  code         String
+  name         String
+  createdAt    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  versions     RuleVersion[]
+  applications CompanyRuleApplication[]
+
+  @@unique([domain, jurisdiction, code])
+  @@map("rule_sets")
+}
+
+// [F13-02 추가] 공식 근거와 적용 조건을 묶은 불변 버전이다. 수정 대신 새 버전을 추가한다.
+model RuleVersion {
+  id                     String                   @id @default(uuid()) @db.Uuid
+  ruleSetId              String                   @map("rule_set_id") @db.Uuid
+  version                String
+  officialSourceTitle    String                   @map("official_source_title")
+  officialSourceUrl      String                   @map("official_source_url")
+  legalProvision         String                   @map("legal_provision")
+  promulgatedOn          DateTime?                @map("promulgated_on") @db.Date
+  effectiveFrom          DateTime                 @map("effective_from") @db.Date
+  effectiveTo            DateTime?                @map("effective_to") @db.Date
+  applicableFrom         DateTime                 @map("applicable_from") @db.Date
+  applicableTo           DateTime?                @map("applicable_to") @db.Date
+  companyConditions      Json                     @map("company_conditions")
+  transitionalProvisions Json                     @map("transitional_provisions")
+  createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  ruleSet                RuleSet                  @relation(fields: [ruleSetId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  artifacts              RuleArtifactVersion[]
+  applications           CompanyRuleApplication[]
+
+  @@unique([ruleSetId, version])
+  @@unique([ruleSetId, id])
+  @@map("rule_versions")
+}
+
+// [F13-03 추가] DB에는 실행 본문 대신 저장소 위치와 내용 SHA-256만 기록한다.
+model RuleArtifactVersion {
+  id                String           @id @default(uuid()) @db.Uuid
+  ruleVersionId     String           @map("rule_version_id") @db.Uuid
+  kind              RuleArtifactKind
+  version           String
+  repositoryLocator String           @map("repository_locator")
+  contentSha256     String           @map("content_sha256") @db.Char(64)
+  metadata          Json
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  ruleVersion       RuleVersion      @relation(fields: [ruleVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([ruleVersionId, kind, version])
+  @@map("rule_artifact_versions")
+}
+
+// 회사에 실제 적용한 규칙 버전과 기간이다. 과거 행을 덮어쓰지 않고 새 기간을 추가한다.
+model CompanyRuleApplication {
+  id            String      @id @default(uuid()) @db.Uuid
+  companyId     String      @map("company_id") @db.Uuid
+  ruleSetId     String      @map("rule_set_id") @db.Uuid
+  ruleVersionId String      @map("rule_version_id") @db.Uuid
+  effectiveFrom DateTime    @map("effective_from") @db.Date
+  effectiveTo   DateTime?   @map("effective_to") @db.Date
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ruleSet       RuleSet     @relation(fields: [ruleSetId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ruleVersion   RuleVersion @relation(fields: [ruleSetId, ruleVersionId], references: [ruleSetId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, ruleSetId, effectiveFrom])
+  @@index([companyId, id])
+  @@map("company_rule_applications")
+}

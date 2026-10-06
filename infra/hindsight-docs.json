@@ -1,0 +1,12 @@
+{
+  "base_url": "http://127.0.0.1:8888",
+  "bank_id": "atms",
+  "include": ["AGENTS.md", "docs/**/*.md"],
+  "tags": ["atms", "project-docs"],
+  "bank_profile": {
+    "name": "ATMS accounting and tax project",
+    "retain_extraction_mode": "chunks",
+    "enable_observations": false,
+    "reflect_mission": "Reference ATMS project development documents. Distinguish confirmed requirements, design proposals, implemented features and verified results. Preserve source paths, rule versions and historical qualifications. The repository documents are authoritative."
+  }
+}

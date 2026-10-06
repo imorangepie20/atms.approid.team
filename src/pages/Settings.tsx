@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
     User,
     Bell,
@@ -9,17 +9,17 @@ import {
     CreditCard,
     Mail,
     Smartphone,
-    Moon,
-    Sun,
     Save,
 } from 'lucide-react'
 import HudCard from '../components/common/HudCard'
 import Button from '../components/common/Button'
+import AppearanceSettings from '../components/settings/AppearanceSettings'
+import AccountSecuritySettings from '../components/settings/AccountSecuritySettings'
 
 const settingsSections = [
     { id: 'profile', label: 'Profile', icon: <User size={18} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
-    { id: 'security', label: 'Security', icon: <Lock size={18} /> },
+    { id: 'security', label: '계정 보안', icon: <Lock size={18} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={18} /> },
     { id: 'language', label: 'Language', icon: <Globe size={18} /> },
     { id: 'privacy', label: 'Privacy', icon: <Shield size={18} /> },
@@ -27,32 +27,43 @@ const settingsSections = [
 ]
 
 const Settings = () => {
-    const [activeSection, setActiveSection] = useState('profile')
-    const [darkMode, setDarkMode] = useState(true)
+    const [searchParams, setSearchParams] = useSearchParams()
+    const requestedSection = searchParams.get('section')
+    const activeSection = settingsSections.find(section => section.id === requestedSection)?.id ?? 'profile'
+    const setActiveSection = (section: string) => setSearchParams(current => {
+        const next = new URLSearchParams(current)
+        next.set('section', section)
+        return next
+    })
 
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Page Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-hud-text-primary">Settings</h1>
                     <p className="text-hud-text-muted mt-1">Manage your account and preferences.</p>
                 </div>
-                <Button variant="primary" glow leftIcon={<Save size={18} />}>
-                    Save Changes
-                </Button>
+                {/* [F01 계정 보안 연결] 동작별 제출을 사용하므로 이 패널의 임시 저장 버튼을 표시하지 않는다. */}
+                {activeSection !== 'appearance' && activeSection !== 'security' && (
+                    <Button variant="primary" glow leftIcon={<Save size={18} />}>
+                        Save Changes
+                    </Button>
+                )}
             </div>
 
-            <div className="flex gap-6">
+            <div className="flex flex-col lg:flex-row gap-6">
                 {/* Sidebar */}
-                <div className="w-56 flex-shrink-0">
+                <div className="lg:w-56 flex-shrink-0">
                     <HudCard noPadding>
                         <div className="py-2">
                             {settingsSections.map((section) => (
                                 <button
                                     key={section.id}
+                                    type="button"
+                                    aria-current={activeSection === section.id ? 'page' : undefined}
                                     onClick={() => setActiveSection(section.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 transition-hud ${activeSection === section.id
+                                    className={`w-full flex items-center gap-3 px-4 py-3 transition-hud focus-visible:outline focus-visible:outline-2 focus-visible:outline-hud-text-primary focus-visible:outline-offset-[-2px] ${activeSection === section.id
                                             ? 'bg-hud-accent-primary/10 text-hud-accent-primary border-l-2 border-hud-accent-primary'
                                             : 'text-hud-text-secondary hover:bg-hud-bg-hover hover:text-hud-text-primary'
                                         }`}
@@ -66,7 +77,7 @@ const Settings = () => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 space-y-6">
+                <div className="flex-1 min-w-0 space-y-6">
                     {activeSection === 'profile' && (
                         <HudCard title="Profile Settings" subtitle="Update your personal information">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -142,111 +153,9 @@ const Settings = () => {
                         </HudCard>
                     )}
 
-                    {activeSection === 'appearance' && (
-                        <HudCard title="Appearance" subtitle="Customize the look and feel">
-                            <div className="space-y-6">
-                                {/* Theme Toggle */}
-                                <div className="flex items-center justify-between p-4 bg-hud-bg-primary rounded-lg">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-2 bg-hud-accent-primary/10 rounded-lg text-hud-accent-primary">
-                                            {darkMode ? <Moon size={18} /> : <Sun size={18} />}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-hud-text-primary">Dark Mode</p>
-                                            <p className="text-xs text-hud-text-muted">Toggle dark/light theme</p>
-                                        </div>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={darkMode}
-                                            onChange={() => setDarkMode(!darkMode)}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-hud-bg-hover peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-hud-accent-primary"></div>
-                                    </label>
-                                </div>
+                    {activeSection === 'appearance' && <AppearanceSettings />}
 
-                                {/* Accent Color */}
-                                <div>
-                                    <label className="block text-sm text-hud-text-secondary mb-3">Accent Color</label>
-                                    <div className="flex gap-3">
-                                        {['#00FFCC', '#6366F1', '#FF1493', '#FFA500', '#10B981', '#EF4444'].map((color) => (
-                                            <button
-                                                key={color}
-                                                className={`w-10 h-10 rounded-lg transition-transform hover:scale-110 ${color === '#00FFCC' ? 'ring-2 ring-offset-2 ring-offset-hud-bg-secondary ring-white' : ''}`}
-                                                style={{ backgroundColor: color }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Font Size */}
-                                <div>
-                                    <label className="block text-sm text-hud-text-secondary mb-3">Font Size</label>
-                                    <div className="flex gap-2">
-                                        {['Small', 'Medium', 'Large'].map((size) => (
-                                            <button
-                                                key={size}
-                                                className={`px-4 py-2 rounded-lg text-sm transition-hud ${size === 'Medium'
-                                                        ? 'bg-hud-accent-primary text-hud-bg-primary'
-                                                        : 'bg-hud-bg-primary text-hud-text-secondary hover:text-hud-text-primary'
-                                                    }`}
-                                            >
-                                                {size}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </HudCard>
-                    )}
-
-                    {activeSection === 'security' && (
-                        <HudCard title="Security Settings" subtitle="Protect your account">
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="block text-sm text-hud-text-secondary mb-2">Current Password</label>
-                                    <input
-                                        type="password"
-                                        placeholder="Enter current password"
-                                        className="w-full px-4 py-2.5 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-hud-text-secondary mb-2">New Password</label>
-                                    <input
-                                        type="password"
-                                        placeholder="Enter new password"
-                                        className="w-full px-4 py-2.5 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-hud-text-secondary mb-2">Confirm Password</label>
-                                    <input
-                                        type="password"
-                                        placeholder="Confirm new password"
-                                        className="w-full px-4 py-2.5 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                    />
-                                </div>
-
-                                <div className="pt-4 border-t border-hud-border-secondary">
-                                    <div className="flex items-center justify-between p-4 bg-hud-bg-primary rounded-lg">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-2 bg-hud-accent-primary/10 rounded-lg text-hud-accent-primary">
-                                                <Shield size={18} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-hud-text-primary">Two-Factor Authentication</p>
-                                                <p className="text-xs text-hud-text-muted">Add an extra layer of security</p>
-                                            </div>
-                                        </div>
-                                        <Button variant="outline" size="sm">Enable</Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </HudCard>
-                    )}
+                    {activeSection === 'security' && <AccountSecuritySettings />}
 
                     {(activeSection !== 'profile' && activeSection !== 'notifications' && activeSection !== 'appearance' && activeSection !== 'security') && (
                         <HudCard title={settingsSections.find(s => s.id === activeSection)?.label} subtitle="Settings coming soon">

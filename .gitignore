@@ -4,3 +4,23 @@ dist
 # Secrets (tunnel tokens, env files)
 infra/secrets/*.env
 !infra/secrets/*.env.example
+
+# Development credentials and generated tool output
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+server/dist/
+server/src/generated/
+playwright-report/
+test-results/
+.artifacts/
+*.tsbuildinfo
+
+# Local IDE, logs, and Python cache
+.idea/
+debug.log
+__pycache__/
+*.py[cod]

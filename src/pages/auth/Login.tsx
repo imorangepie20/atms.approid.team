@@ -1,121 +1,49 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
-import Button from '../../components/common/Button'
+import { useEffect } from 'react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import AccountLoginForm from '../../components/auth/AccountLoginForm'
+import { AccountNotice } from '../../components/auth/AccountPasswordForm'
+import { useAuth } from '../../context/AuthContext'
 
 const Login = () => {
-    const [showPassword, setShowPassword] = useState(false)
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
-
-    return (
-        <div className="min-h-screen bg-hud-bg-primary hud-grid-bg flex items-center justify-center p-6">
-            <div className="w-full max-w-md">
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-gradient-to-br from-hud-accent-primary to-hud-accent-info rounded-lg flex items-center justify-center font-bold text-xl text-hud-bg-primary">
-                            H
-                        </div>
-                        <span className="font-bold text-2xl text-hud-text-primary text-glow">ALPHA TEAM</span>
-                    </div>
-                    <h1 className="text-2xl font-bold text-hud-text-primary">Welcome Back</h1>
-                    <p className="text-hud-text-muted mt-2">Sign in to your account to continue</p>
+    const { status } = useAuth()
+    const navigate = useNavigate()
+    const location = useLocation()
+    // [F01 계정 보안 안내 추가] router state는 고정 키만 해석한다. 임의 문자열/서버 오류/입력값은 출력하지 않는다.
+    const notices: Record<string, string> = {
+        'password-changed': '비밀번호를 변경했습니다. 새 비밀번호로 다시 로그인해 주세요.',
+        'all-signed-out': '모든 기기에서 로그아웃했습니다. 다시 로그인해 주세요.',
+        'account-action-unknown': '계정 작업 결과를 확인하지 못했습니다. 로그인으로 결과를 확인해 주세요.',
+        'session-expired': '세션이 만료되었습니다. 다시 로그인해 주세요.',
+    }
+    const noticeKey = location.state?.accountNotice
+    // [F01 호환성 수리] ES2020에서 사용 가능한 자체 속성 검사로 __proto__ 등 상속된 이름을 차단한다.
+    const notice = typeof noticeKey === 'string' && Object.prototype.hasOwnProperty.call(notices, noticeKey) ? notices[noticeKey] : ''
+    const from = typeof location.state?.from === 'string' && location.state.from.startsWith('/')
+        ? location.state.from : '/accounting/rules'
+    useEffect(() => { document.title = '로그인 · ATMS' }, [])
+    if (status === 'authenticated') return <Navigate to={from} replace />
+    // [F01 양식 분리] 일반 로그인은 기존 보호 경로 복귀를 유지한다.
+    return <main className="min-h-screen bg-hud-bg-primary hud-grid-bg flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+            <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-3 mb-6">
+                    <div aria-hidden="true" className="w-12 h-12 bg-gradient-to-br from-hud-accent-primary to-hud-accent-info rounded-lg flex items-center justify-center font-bold text-xl text-hud-bg-primary">A</div>
+                    <span className="font-bold text-2xl text-hud-text-primary text-glow">ATMS</span>
                 </div>
-
-                {/* Login Form */}
-                <div className="hud-card hud-card-bottom rounded-lg p-8">
-                    <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-                        {/* Email */}
-                        <div>
-                            <label className="block text-sm text-hud-text-secondary mb-2">Email Address</label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="Enter your email"
-                                    className="w-full pl-12 pr-4 py-3 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary placeholder-hud-text-muted focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Password */}
-                        <div>
-                            <label className="block text-sm text-hud-text-secondary mb-2">Password</label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter your password"
-                                    className="w-full pl-12 pr-12 py-3 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary placeholder-hud-text-muted focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-hud-text-muted hover:text-hud-text-primary transition-hud"
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Remember & Forgot */}
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="w-4 h-4 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
-                                />
-                                <span className="text-sm text-hud-text-secondary">Remember me</span>
-                            </label>
-                            <a href="#" className="text-sm text-hud-accent-primary hover:underline">
-                                Forgot password?
-                            </a>
-                        </div>
-
-                        {/* Submit */}
-                        <Button variant="primary" fullWidth glow type="submit">
-                            Sign In
-                        </Button>
-                    </form>
-
-                    {/* Divider */}
-                    <div className="relative my-6">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-hud-border-secondary"></div>
-                        </div>
-                        <div className="relative flex justify-center">
-                            <span className="px-4 bg-hud-bg-card text-sm text-hud-text-muted">or continue with</span>
-                        </div>
-                    </div>
-
-                    {/* Social Login */}
-                    <div className="grid grid-cols-3 gap-3">
-                        {['Google', 'GitHub', 'Twitter'].map((provider) => (
-                            <button
-                                key={provider}
-                                className="py-2.5 px-4 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-sm text-hud-text-secondary hover:border-hud-accent-primary hover:text-hud-accent-primary transition-hud"
-                            >
-                                {provider}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Register Link */}
-                    <p className="text-center text-sm text-hud-text-muted mt-6">
-                        Don't have an account?{' '}
-                        <Link to="/register" className="text-hud-accent-primary hover:underline">
-                            Sign up
-                        </Link>
-                    </p>
-                </div>
+                <h1 className="text-2xl font-bold text-hud-text-primary">계정 로그인</h1>
+                <p className="text-hud-text-muted mt-2">회사별 회계·세무 업무 공간에 접속합니다.</p>
+            </div>
+            <div className="hud-card hud-card-bottom rounded-lg p-6 sm:p-8">
+                {notice && <div className="mb-4"><AccountNotice>{notice}</AccountNotice></div>}
+                <AccountLoginForm onSuccess={() => navigate(from, { replace: true })} />
+                {/* [F01 계정 도움 추가] 링크 이동만으로 가입/발송/토큰 소비를 실행하지 않는다. */}
+                <nav aria-label="계정 도움" className="mt-5 flex flex-wrap gap-x-4 text-sm">
+                    <Link to="/register" className="inline-flex min-h-11 items-center text-hud-accent-primary underline focus-visible:outline focus-visible:outline-2">계정 가입</Link>
+                    <Link to="/verify-email" className="inline-flex min-h-11 items-center text-hud-accent-primary underline focus-visible:outline focus-visible:outline-2">확인 메일 다시 요청</Link>
+                    <Link to="/forgot-password" className="inline-flex min-h-11 items-center text-hud-accent-primary underline focus-visible:outline focus-visible:outline-2">비밀번호 복구</Link>
+                </nav>
             </div>
         </div>
-    )
+    </main>
 }
-
 export default Login
