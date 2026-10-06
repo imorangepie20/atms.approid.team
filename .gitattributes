@@ -1,5 +1,5 @@
 # Prisma records migration checksums byte-for-byte. Keep SQL stable across Windows and Linux.
-server/prisma/migrations/*.sql text eol=lf
+server/prisma/migrations/**/*.sql text eol=lf
 
 # These files execute in Linux containers or on the home server.
 *.sh text eol=lf
