@@ -39,7 +39,7 @@ export default function Approvals() {
         queryFn: ({ signal, pageParam }) => journalWorkflowApi.detail(companyId, detailId, pageParam, signal), getNextPageParam: page => page.history.nextCursor ?? undefined })
     const current = workflow.data?.pages[0], events = workflow.data?.pages.flatMap(page => page.history.items) ?? []
     const clearCompany = useCallback(async (id: string) => {
-        for (const prefix of ['journal-approvals', 'journal-workflow', 'approval-workflow-history', 'approval-years', 'journal', 'journals', 'evidence-journals']) {
+        for (const prefix of ['journal-approvals', 'journal-workflow', 'approval-workflow-history', 'approval-years', 'journal', 'journals', 'evidence-journals', 'opening-balance', 'journal-book', 'account-ledger']) {
             await cache.cancelQueries({ queryKey: [prefix, userId, id] }); cache.removeQueries({ queryKey: [prefix, userId, id] })
         }
     }, [cache, userId])
@@ -89,6 +89,10 @@ export default function Approvals() {
             cache.invalidateQueries({ queryKey: ['journal', userId, attempt.companyId, attempt.journalId] }),
             cache.invalidateQueries({ queryKey: ['journals', userId, attempt.companyId] }),
             cache.invalidateQueries({ queryKey: ['evidence-journals', userId, attempt.companyId] }),
+            // [F05 B4] POSTED 전이는 기초 잔액 상태와 두 원장 조회를 즉시 무효화한다.
+            cache.invalidateQueries({ queryKey: ['opening-balance', userId, attempt.companyId] }),
+            cache.invalidateQueries({ queryKey: ['journal-book', userId, attempt.companyId] }),
+            cache.invalidateQueries({ queryKey: ['account-ledger', userId, attempt.companyId] }),
         ])
     }
     const execute = async (attempt: Attempt, retry = false) => {

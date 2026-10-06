@@ -7,14 +7,14 @@ interface Props {
     allowed: JournalWorkflowAction[]; locked: boolean; uncertain: boolean
     onAction: (action: JournalWorkflowAction, reason?: string) => void; onRetry: () => void; onRefresh: () => void
 }
-const labels = { SUBMIT: '승인 요청', APPROVE: '승인', REJECT: '반려', RETURN_TO_DRAFT: '초안 복귀' }
+const labels = { SUBMIT: '승인 요청', APPROVE: '승인', REJECT: '반려', RETURN_TO_DRAFT: '초안 복귀', CONFIRM: '장부 반영' }
 
 // [F05 A5/A6] 한 번에 한 작업만 확인한다. 결과 불명 재시도는 부모가 보관한 원래 본문/요청 ID로만 수행한다.
 export default function ApprovalActionForm({ allowed, locked, uncertain, onAction, onRetry, onRefresh }: Props) {
-    const [choice, setChoice] = useState<JournalWorkflowAction | null>(null), [reason, setReason] = useState(''), [error, setError] = useState('')
+    const [choice, setChoice] = useState<JournalWorkflowAction | null>(null), [reason, setReason] = useState(''), [confirmed, setConfirmed] = useState(false), [error, setError] = useState('')
     const alert = useRef<HTMLParagraphElement>(null)
     useEffect(() => { if (error) alert.current?.focus({ preventScroll: true }) }, [error])
-    const choose = (action: JournalWorkflowAction) => { setChoice(action); setReason(''); setError('') }
+    const choose = (action: JournalWorkflowAction) => { setChoice(action); setReason(''); setConfirmed(false); setError('') }
     return <section className="hud-card rounded-xl p-4 sm:p-6 min-w-0 space-y-3" aria-labelledby="approval-actions-title">
         <h2 id="approval-actions-title" className="text-xl font-semibold">가능한 처리</h2>
         {uncertain ? <div className="space-y-3"><p role="status">이전 요청의 결과를 확인하지 못했습니다. 자동 재전송하지 않습니다.</p><div className="flex flex-wrap gap-2"><Button type="button" className="min-h-11" disabled={locked} onClick={onRetry}>같은 요청으로 결과 확인</Button><Button type="button" variant="outline" className="min-h-11" disabled={locked} onClick={onRefresh}>현재 상태 조회</Button></div></div> : <>
@@ -23,8 +23,9 @@ export default function ApprovalActionForm({ allowed, locked, uncertain, onActio
             {choice && allowed.includes(choice) && <form className="rounded-lg border border-hud-border-secondary p-3 space-y-3" noValidate onSubmit={event => {
                 event.preventDefault(); const trimmed = reason.trim()
                 if (choice === 'REJECT' && (!trimmed || [...trimmed].length > 500 || trimmed.includes('\0'))) { setError('반려 사유를 1~500자로 입력해 주세요.'); return }
-                setError(''); onAction(choice, choice === 'REJECT' ? trimmed : undefined); setChoice(null); setReason('')
-            }}><p>{labels[choice]} 처리를 확인해 주세요.</p>{choice === 'REJECT' && <div><label htmlFor="approval-reason" className="mb-2 block">반려 사유 (필수, 1~500자)</label><textarea id="approval-reason" className={journalInputClass} rows={4} value={reason} disabled={locked} aria-invalid={Boolean(error)} aria-describedby={error ? 'approval-reason-error' : undefined} onChange={event => setReason(event.target.value)} />{error && <p ref={alert} tabIndex={-1} id="approval-reason-error" role="alert" className="mt-2 text-hud-accent-danger">{error}</p>}</div>}<div className="flex flex-wrap gap-2"><Button type="submit" className="min-h-11" disabled={locked}>{labels[choice]} 확정</Button><Button type="button" variant="ghost" className="min-h-11" disabled={locked} onClick={() => setChoice(null)}>취소</Button></div></form>}
+                if (choice === 'CONFIRM' && !confirmed) { setError('장부 반영 후 직접 수정할 수 없음을 확인해 주세요.'); return }
+                setError(''); onAction(choice, choice === 'REJECT' ? trimmed : undefined); setChoice(null); setReason(''); setConfirmed(false)
+            }}><p>{choice === 'CONFIRM' ? '확정하면 전표가 장부에 반영되며 직접 수정할 수 없습니다.' : `${labels[choice]} 처리를 확인해 주세요.`}</p>{choice === 'REJECT' && <div><label htmlFor="approval-reason" className="mb-2 block">반려 사유 (필수, 1~500자)</label><textarea id="approval-reason" className={journalInputClass} rows={4} value={reason} disabled={locked} aria-invalid={Boolean(error)} aria-describedby={error ? 'approval-action-error' : undefined} onChange={event => setReason(event.target.value)} /></div>}{choice === 'CONFIRM' && <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={confirmed} disabled={locked} aria-describedby={error ? 'approval-action-error' : undefined} onChange={event => setConfirmed(event.target.checked)} />장부 반영과 원본 불변을 확인합니다</label>}{error && <p ref={alert} tabIndex={-1} id="approval-action-error" role="alert" className="mt-2 text-hud-accent-danger">{error}</p>}<div className="flex flex-wrap gap-2"><Button type="submit" className="min-h-11" disabled={locked}>{labels[choice]} 확정</Button><Button type="button" variant="ghost" className="min-h-11" disabled={locked} onClick={() => setChoice(null)}>취소</Button></div></form>}
         </>}
     </section>
 }

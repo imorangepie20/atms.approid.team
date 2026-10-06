@@ -394,8 +394,8 @@ export interface UpdateJournalInput extends JournalContent { version: number }
 export interface JournalFilters { q?: string; fiscalYearId?: string; from?: string; to?: string }
 const journalsPath = (companyId: string) => `/api/companies/${encodeURIComponent(companyId)}/journals`
 // [F05 A1 승인 화면 계약] 서버의 제출본은 저장 시점 스냅샷이며 금액은 끝까지 문자열로 보관한다.
-export type JournalWorkflowAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'RETURN_TO_DRAFT'
-export type JournalWorkflowHistoryAction = JournalWorkflowAction | 'CONFIRM'
+export type JournalWorkflowAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'RETURN_TO_DRAFT' | 'CONFIRM'
+export type JournalWorkflowHistoryAction = JournalWorkflowAction
 export interface JournalSubmissionContent extends Omit<JournalContent, 'lines'> {
     lines: (JournalLineInput & { id: string; position: number })[]
 }
@@ -424,7 +424,7 @@ export const journalWorkflowApi = {
     },
     // [F05 A1] 쓰기는 동일 출처의 세션/CSRF를 사용한다. 처리 시각·행위자는 서버만 정한다.
     action: (companyId: string, id: string, action: JournalWorkflowAction, input: JournalWorkflowActionInput & { reason?: string }, csrfToken: string) => {
-        const suffix = { SUBMIT: 'submit', APPROVE: 'approve', REJECT: 'reject', RETURN_TO_DRAFT: 'return-to-draft' }[action]
+        const suffix = { SUBMIT: 'submit', APPROVE: 'approve', REJECT: 'reject', RETURN_TO_DRAFT: 'return-to-draft', CONFIRM: 'confirm' }[action]
         return requestJson<JournalWorkflowResult>(`${workflowPath(companyId, id)}/${suffix}`, {
             method: 'POST', body: JSON.stringify(action === 'REJECT' ? { ...input, reason: input.reason } : input), csrfToken,
         })
@@ -444,6 +444,55 @@ export const journalApi = {
         const query = new URLSearchParams({ limit: '20' }); if (cursor) query.set('cursor', cursor)
         return requestJson<CursorPage<JournalSummary>>(`/api/companies/${encodeURIComponent(companyId)}/evidence/${encodeURIComponent(id)}/journals?${query}`, { signal })
     },
+}
+
+// [F04/F05 B1] 서버가 확정한 OPENING·POSTED 원장 계약만 표현한다. 금액은 끝까지 문자열로 유지한다.
+export interface OpeningBalanceView {
+    id: string; kind: 'OPENING'; number: string; fiscalYearId: string; sourceFiscalYearId: string | null
+    accountingDate: string; memo: string; currency: 'KRW'; status: JournalStatus; version: number; isZero: boolean
+    debitTotal: string; creditTotal: string; lineCount: number; evidenceCount: number; createdById: string
+    createdAt: string; updatedAt: string; evidenceIds: string[]
+    lines: (JournalLineInput & { id: string; position: number })[]
+}
+export interface OpeningBalanceContent { sourceFiscalYearId: string | null; evidenceIds: string[]; lines: JournalLineInput[] }
+export interface CreateOpeningBalanceInput extends OpeningBalanceContent { creationRequestId: string }
+export interface UpdateOpeningBalanceInput extends OpeningBalanceContent { version: number }
+export interface LedgerFilters { fiscalYearId?: string; from?: string; to?: string; postedThrough?: string; q?: string; limit?: number }
+export interface JournalBookFilters extends LedgerFilters { accountId?: string }
+export interface AccountLedgerFilters extends LedgerFilters { fiscalYearId: string }
+export interface LedgerLineView {
+    id: string; position: number; journalId: string; kind: 'STANDARD' | 'OPENING'; journalNumber: string
+    fiscalYearId: string; accountingDate: string; postedAt: string; journalMemo: string; lineMemo: string | null
+    account: { id: string; code: string; name: string }; debit: string; credit: string; net: string; runningBalance: string
+}
+export interface LedgerTotals { debit: string; credit: string; net: string }
+export interface JournalBookView extends CursorPage<LedgerLineView> { totals: LedgerTotals }
+export interface AccountLedgerView extends CursorPage<LedgerLineView> {
+    account: Pick<AccountView, 'id' | 'code' | 'name' | 'active' | 'normalBalance'>
+    openingBalance: string; openingBalanceStatus: 'MISSING' | 'CONFIRMED_ZERO' | 'POSTED'
+    openingBalanceJournalId: string | null; totals: LedgerTotals; closingBalance: string
+}
+const queryLedger = (filters: LedgerFilters & { accountId?: string }, cursor?: string) => {
+    const query = new URLSearchParams({ limit: String(filters.limit ?? 20) })
+    for (const key of ['fiscalYearId', 'from', 'to', 'postedThrough', 'q', 'accountId'] as const) {
+        const value = filters[key]; if (value) query.set(key, value)
+    }
+    if (cursor) query.set('cursor', cursor)
+    return query
+}
+export const openingBalanceApi = {
+    get: (companyId: string, fiscalYearId: string, signal?: AbortSignal) => requestJson<OpeningBalanceView>(
+        `/api/companies/${encodeURIComponent(companyId)}/fiscal-years/${encodeURIComponent(fiscalYearId)}/opening-balance`, { signal }),
+    create: (companyId: string, fiscalYearId: string, input: CreateOpeningBalanceInput, csrfToken: string) => requestJson<OpeningBalanceView>(
+        `/api/companies/${encodeURIComponent(companyId)}/fiscal-years/${encodeURIComponent(fiscalYearId)}/opening-balance`, { method: 'POST', body: JSON.stringify(input), csrfToken }),
+    update: (companyId: string, fiscalYearId: string, input: UpdateOpeningBalanceInput, csrfToken: string) => requestJson<OpeningBalanceView>(
+        `/api/companies/${encodeURIComponent(companyId)}/fiscal-years/${encodeURIComponent(fiscalYearId)}/opening-balance`, { method: 'PATCH', body: JSON.stringify(input), csrfToken }),
+}
+export const ledgerApi = {
+    journalBook: (companyId: string, filters: JournalBookFilters, cursor?: string, signal?: AbortSignal) => requestJson<JournalBookView>(
+        `/api/companies/${encodeURIComponent(companyId)}/ledger/journal-book?${queryLedger(filters, cursor)}`, { signal }),
+    account: (companyId: string, accountId: string, filters: AccountLedgerFilters, cursor?: string, signal?: AbortSignal) => requestJson<AccountLedgerView>(
+        `/api/companies/${encodeURIComponent(companyId)}/ledger/accounts/${encodeURIComponent(accountId)}?${queryLedger(filters, cursor)}`, { signal }),
 }
 
 export const evidenceApi = {

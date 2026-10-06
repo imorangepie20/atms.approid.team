@@ -7,6 +7,7 @@ import Evidence from './pages/accounting/Evidence'
 import Accounts from './pages/accounting/Accounts'
 import Journals from './pages/accounting/Journals'
 import Approvals from './pages/accounting/Approvals'
+import Ledger from './pages/accounting/Ledger'
 import CompanyManagement from './pages/companies/CompanyManagement'
 import AcceptCompanyInvitation from './pages/companies/AcceptCompanyInvitation'
 import CompanyAccessRequests from './pages/companies/CompanyAccessRequests'
@@ -115,6 +116,8 @@ function App() {
                     <Route path="accounting/journals" element={<Journals />} />
                     {/* [F05 A3] 승인 목록·이력은 같은 세션 경계 안에서 회사 권한을 재확인한다. */}
                     <Route path="accounting/approvals" element={<Approvals />} />
+                    {/* [F04 B2] 기초 잔액·분개장·계정별 원장은 같은 회사 선택 경계에서 제공한다. */}
+                    <Route path="accounting/ledger" element={<Ledger />} />
 
                     {/* Email */}
                     <Route path="email/inbox" element={<EmailInbox />} />

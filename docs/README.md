@@ -76,6 +76,7 @@ F04-01 계정과목 서버 부분 완료(2026-10-06): 사용자 “확정” 범
 | F05 승인 요청·처리 화면과 운영 반영 제안 | [A1~A8·기존 승인 API6개·예정15파일·미실행K1~K8](features/05-approval-browser-design.md) | [완료한 승인 서버](features/05-journal-approval-foundation-design.md), [권한·마감](features/05-approval-closing.md), [배포](features/12-deployment.md) |
 | F05·F04 POSTED 확정·원장 첫 서버 부분 완료 | [P1~P8·API3개·구현20파일·K1~K8 PASS](features/05-journal-posting-ledger-foundation-design.md) | [전표와 원장](features/04-journals-ledger.md), [승인과 마감](features/05-approval-closing.md), [구현 계획](IMPLEMENTATION_PLAN.md) |
 | F04-02 기초 잔액 첫 서버 묶음 제안 | [O1~O8·API3개·구현19파일·미실행 K1~K8](features/04-opening-balance-foundation-design.md) | [전표와 원장](features/04-journals-ledger.md), [승인과 마감](features/05-approval-closing.md), [직전 POSTED·원장 기반](features/05-journal-posting-ledger-foundation-design.md) |
+| F04·F05 기초 잔액·확정·원장 화면과 홈서버 반영 제안 | [B1~B8·기존API6개·구현20파일·미실행 K1~K8](features/04-opening-ledger-browser-design.md) | [기초 잔액 서버](features/04-opening-balance-foundation-design.md), [POSTED·원장 서버](features/05-journal-posting-ledger-foundation-design.md), [배포](features/12-deployment.md) |
 | Settings Appearance: 테마·강조색·글자 크기 | [공통 시스템 기반의 Appearance 계약](features/08-platform.md#settings--appearance-구현-계약) | [문서 동기화](HINDSIGHT_SYNC.md) |
 | 로그인과 회사별 접근 제어 | [회사와 사용자 권한](features/01-company-access.md) | [공통 시스템 기반](features/08-platform.md) |
 | F01·F08-13 첫 서버 묶음의 구현 범위·파일 목록 검토 | [첫 서버 묶음 확정·코드 흐름·검증 기록](features/01-auth-session-design.md) | [확정한 인증 정책](features/01-company-access.md#사용자-위임으로-확정한-인증-기본-정책), [구현 계획](IMPLEMENTATION_PLAN.md) |

@@ -22,6 +22,8 @@ const menuItems: MenuItem[] = [
         { title: '전표 초안', path: '/accounting/journals' },
         // [F05 A3] 실제 승인 화면 진입점. 현재 위치는 기존 aria-current와 활성 스타일을 사용한다.
         { title: '전표 승인', path: '/accounting/approvals' },
+        // [F04 B2] OPENING 등록과 POSTED 원장 조회의 실제 진입점이다.
+        { title: '기초 잔액·원장', path: '/accounting/ledger' },
     ] },
     { title: '설정', icon: <Settings size={20} aria-hidden="true" />, path: '/settings' },
 ]

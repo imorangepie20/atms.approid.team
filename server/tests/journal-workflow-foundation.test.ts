@@ -243,6 +243,20 @@ describe('F05 isolated workflow HTTP + DB', () => {
     await expect(db.journalPosting.delete({ where: { id: posting!.id } })).rejects.toThrow()
   }, 60000)
 
+  it('B4 exposes CONFIRM only to a current confirmer allowed by self-approval policy', async () => {
+    await db.company.update({ where: { id: company.id }, data: { allowSelfApproval: false } })
+    const row = await create(); await run(row.id, 'submit', writerLogin, action(1)); await run(row.id, 'approve', reviewerLogin, action(2))
+    const writerView = await request(path(`/${row.id}/workflow`), { login: writerLogin })
+    const reviewerView = await request(path(`/${row.id}/workflow`), { login: reviewerLogin })
+    expect(writerView.status).toBe(200); expect(writerView.data.allowedActions).toEqual([])
+    expect(reviewerView.status).toBe(200); expect(reviewerView.data.allowedActions).toEqual(['CONFIRM'])
+    await db.company.update({ where: { id: company.id }, data: { allowSelfApproval: true } })
+    try {
+      const selfAllowed = await request(path(`/${row.id}/workflow`), { login: writerLogin })
+      expect(selfAllowed.status).toBe(200); expect(selfAllowed.data.allowedActions).toEqual(['CONFIRM'])
+    } finally { await db.company.update({ where: { id: company.id }, data: { allowSelfApproval: false } }) }
+  }, 60000)
+
   it('posting K4 rolls back POSTED state, action and posting when audit or SQL integrity fails', async () => {
     const row = await create(); await run(row.id, 'submit', writerLogin, action(1)); await run(row.id, 'approve', reviewerLogin, action(2))
     const before = await db.journalEntry.findUnique({ where: { id: row.id } })

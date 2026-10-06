@@ -8,8 +8,9 @@ const submission = { id: id(10), createdById: id(8), createdAt: '2026-10-07T01:0
 const entry = { id: journal, number: '2026-1', fiscalYearId: year, accountingDate: '2026-10-07', memo: '가상 승인 적요', currency: 'KRW', status: 'SUBMITTED', version: 2, debitTotal: '1000', creditTotal: '1000', lineCount: 2, evidenceCount: 1, createdAt: '2026-10-07T00:00:00Z', updatedAt: '2026-10-07T00:00:00Z', createdById: id(8), counterpartyId: null, evidenceIds: [evidence], lines: [] }
 
 // [F05 A7] 실제 앱 메뉴/Router/키보드와 레이아웃을 사용하고 네트워크 응답만 역할별로 대체한다.
-async function fixture(page: Page, role: CompanyRole = 'COMPANY_ADMIN') {
+async function fixture(page: Page, role: CompanyRole = 'COMPANY_ADMIN', initialStatus: 'SUBMITTED' | 'APPROVED' = 'SUBMITTED') {
     const unexpected: string[] = [], sent: { path: string; body: any }[] = []
+    let current = { ...entry, status: initialStatus, version: initialStatus === 'APPROVED' ? 3 : 2 }
     await page.route('**/api/**', route => {
         const request = route.request(), url = new URL(request.url()), path = url.pathname
         let body: unknown
@@ -17,18 +18,30 @@ async function fixture(page: Page, role: CompanyRole = 'COMPANY_ADMIN') {
         else if (path === '/api/companies') body = { items: [{ id: company, name: '가상 승인 회사' }], nextCursor: null }
         else if (path.endsWith('/select')) body = { company: { id: company, name: '가상 승인 회사', allowSelfApproval: false }, roles: [role], permissions: ['journal.read'] }
         else if (path.endsWith('/fiscal-years')) body = { items: [{ id: year, startDate: '2026-01-01', endDate: '2026-12-31' }], nextCursor: null }
-        else if (path.endsWith('/journal-approval-requests')) body = { items: url.searchParams.get('status') === 'SUBMITTED' ? [entry] : [], nextCursor: null }
-        else if (path.endsWith('/workflow')) body = { journal: entry, allowedActions: ['COMPANY_ADMIN', 'APPROVER'].includes(role) ? ['APPROVE', 'REJECT'] : [], history: { items: [{ id: id(11), action: 'SUBMIT', statusBefore: 'DRAFT', statusAfter: 'SUBMITTED', versionBefore: 1, versionAfter: 2, actorId: id(8), reason: null, createdAt: '2026-10-07T01:00:00.000Z', submission }], nextCursor: null } }
+        else if (path.endsWith('/journal-approval-requests')) body = { items: url.searchParams.get('status') === current.status ? [current] : [], nextCursor: null }
+        else if (path.endsWith('/workflow')) body = { journal: current, allowedActions: ['COMPANY_ADMIN', 'APPROVER'].includes(role) ? current.status === 'SUBMITTED' ? ['APPROVE', 'REJECT'] : current.status === 'APPROVED' ? ['CONFIRM'] : [] : [], history: { items: [{ id: id(11), action: 'SUBMIT', statusBefore: 'DRAFT', statusAfter: 'SUBMITTED', versionBefore: 1, versionAfter: 2, actorId: id(8), reason: null, createdAt: '2026-10-07T01:00:00.000Z', submission }], nextCursor: null } }
         else if (path.endsWith('/journals')) body = { items: [entry], nextCursor: null }
         else if (path.endsWith(`/journals/${journal}`)) body = entry
         else if (path.endsWith(`/evidence/${evidence}`)) body = { evidence: { id: evidence, title: '가상 증빙', originalFileName: 'test.pdf', mediaType: 'application/pdf', active: true } }
         else if (path.endsWith(`/accounts/${account}`)) body = { id: account, code: '101', name: '가상 계정', active: true, canUseInJournal: true }
         else if (request.method() === 'POST' && path.endsWith('/reject')) { sent.push({ path, body: request.postDataJSON() }); body = { id: id(12), status: 'REJECTED', version: 3 } }
+        else if (request.method() === 'POST' && path.endsWith('/confirm')) { sent.push({ path, body: request.postDataJSON() }); current = { ...current, status: 'POSTED', version: current.version + 1 }; body = { id: id(13), status: 'POSTED', version: current.version } }
         else { unexpected.push(`${request.method()} ${path}`); return route.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"UNMOCKED"}' }) }
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
     })
     return { unexpected, sent }
 }
+
+test('승인 완료 전표는 명시 확인 뒤 한 번만 장부에 반영한다', async ({ page }) => {
+    const result = await fixture(page, 'APPROVER', 'APPROVED')
+    await page.goto('/accounting/approvals'); await page.getByLabel('승인 회사').selectOption(company)
+    await page.getByLabel('승인 상태').selectOption('APPROVED'); await page.getByRole('button', { name: '조건 적용' }).click()
+    await page.getByRole('button', { name: '2026-1 · 가상 승인 적요 상세' }).click(); await page.getByRole('button', { name: '장부 반영' }).click()
+    await page.getByRole('button', { name: '장부 반영 확정' }).click(); await expect(page.getByRole('alert')).toBeFocused()
+    await page.getByLabel('장부 반영과 원본 불변을 확인합니다').check(); await page.getByRole('button', { name: '장부 반영 확정' }).click()
+    await expect(page.getByRole('heading', { name: '2026-1 · 장부 반영' })).toBeVisible()
+    expect(result.sent).toHaveLength(1); expect(result.sent[0].path).toMatch(/\/confirm$/); expect(result.sent[0].body.version).toBe(3); expect(result.unexpected).toEqual([])
+})
 
 test('초안 상세의 승인 링크에서 이력 화면으로 이동해도 캐시 모양이 충돌하지 않는다', async ({ page }) => {
     const result = await fixture(page)

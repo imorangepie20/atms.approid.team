@@ -17,7 +17,7 @@ let calls: Call[], current: JournalDetailView, role: CompanyRole, allowSelfAppro
 let events: JournalWorkflowEvent[], clients: QueryClient[]
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const error = (status: number) => json({ code: 'TEST_ERROR', details: [{ message: 'private internal' }] }, status)
-const writes = () => calls.filter(call => call.method === 'POST' && /\/(approve|reject|return-to-draft|submit)$/.test(call.path))
+const writes = () => calls.filter(call => call.method === 'POST' && /\/(approve|reject|return-to-draft|submit|confirm)$/.test(call.path))
 function Gate({ children }: { children: React.ReactNode }) { return useAuth().status === 'authenticated' ? <>{children}</> : <p>세션 대기</p> }
 function mount(path = '/accounting/approvals') {
     const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0, refetchOnWindowFocus: false } } }); clients.push(cache)
@@ -38,26 +38,27 @@ beforeEach(() => {
         if (call.path.endsWith('/select')) return json({ company: { id: call.path.split('/')[3], name: '가상 회사', allowSelfApproval }, roles: [role], permissions: ['journal.read'] })
         if (call.path.endsWith('/fiscal-years')) return json({ items: [{ id: year, startDate: '2026-01-01', endDate: '2026-12-31' }], nextCursor: null })
         if (call.path.endsWith('/journal-approval-requests')) return json({ items: call.query.get('status') === current.status ? [call.query.has('cursor') ? { ...current, id: id(16), number: '2026-2' } : current] : [], nextCursor: approvalNext && !call.query.has('cursor') ? journal : null })
-        if (call.path.endsWith('/workflow')) return json({ journal: current, allowedActions: current.status === 'SUBMITTED' && ['COMPANY_ADMIN', 'APPROVER'].includes(role) && (current.createdById !== user || allowSelfApproval) ? ['APPROVE', 'REJECT'] : current.status === 'REJECTED' && ['COMPANY_ADMIN', 'ACCOUNTANT', 'EXTERNAL_TAX'].includes(role) ? ['RETURN_TO_DRAFT'] : [], history: { items: call.query.has('cursor') ? [{ ...events[0], id: id(12), action: 'APPROVE', createdAt: '2026-10-07T02:00:00.000Z' }] : events, nextCursor: historyNext && !call.query.has('cursor') ? id(11) : null } })
+        if (call.path.endsWith('/workflow')) return json({ journal: current, allowedActions: current.status === 'SUBMITTED' && ['COMPANY_ADMIN', 'APPROVER'].includes(role) && (current.createdById !== user || allowSelfApproval) ? ['APPROVE', 'REJECT'] : current.status === 'APPROVED' && ['COMPANY_ADMIN', 'APPROVER'].includes(role) && (current.createdById !== user || allowSelfApproval) ? ['CONFIRM'] : current.status === 'REJECTED' && ['COMPANY_ADMIN', 'ACCOUNTANT', 'EXTERNAL_TAX'].includes(role) ? ['RETURN_TO_DRAFT'] : [], history: { items: call.query.has('cursor') ? [{ ...events[0], id: id(12), action: 'APPROVE', createdAt: '2026-10-07T02:00:00.000Z' }] : events, nextCursor: historyNext && !call.query.has('cursor') ? id(11) : null } })
         if (call.path.endsWith(`/accounts/${account}`)) return json({ id: account, code: '101', name: '가상 계정', active: true, canUseInJournal: true })
         if (call.method === 'POST' && call.path.endsWith('/submit')) return json({ id: id(15), status: 'SUBMITTED', version: 2 })
         if (call.method === 'POST' && call.path.endsWith('/approve')) { current = { ...current, status: 'APPROVED', version: current.version + 1 }; events.push({ ...events[0], id: id(12), action: 'APPROVE', statusBefore: 'SUBMITTED', statusAfter: 'APPROVED', versionBefore: 2, versionAfter: 3, actorId: user }); return json({ id: id(12), status: current.status, version: current.version }) }
         if (call.method === 'POST' && call.path.endsWith('/reject')) { current = { ...current, status: 'REJECTED', version: current.version + 1 }; events.push({ ...events[0], id: id(13), action: 'REJECT', statusBefore: 'SUBMITTED', statusAfter: 'REJECTED', versionBefore: 2, versionAfter: 3, actorId: user, reason: call.body.reason }); return json({ id: id(13), status: current.status, version: current.version }) }
         if (call.method === 'POST' && call.path.endsWith('/return-to-draft')) { current = { ...current, status: 'DRAFT', version: current.version + 1 }; return json({ id: id(14), status: current.status, version: current.version }) }
+        if (call.method === 'POST' && call.path.endsWith('/confirm')) { current = { ...current, status: 'POSTED', version: current.version + 1 }; events.push({ ...events[0], id: id(15), action: 'CONFIRM', statusBefore: 'APPROVED', statusAfter: 'POSTED', versionBefore: 3, versionAfter: 4, actorId: user }); return json({ id: id(15), status: current.status, version: current.version }) }
         return error(404)
     }))
 })
 afterEach(() => { cleanup(); clients.forEach(client => client.clear()); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('승인 화면 HTTP 계약과 역할', () => {
-    it('keeps six routes, query filters, exact money and CSRF body', async () => {
+    it('keeps seven workflow routes, query filters, exact money and CSRF body', async () => {
         const controller = new AbortController()
         await journalWorkflowApi.list(company, { status: 'SUBMITTED', limit: 50, q: ' 적요 ', fiscalYearId: year, from: '2026-01-01', to: '2026-12-31' }, undefined, controller.signal)
         await journalWorkflowApi.detail(company, journal, undefined, controller.signal)
-        for (const action of ['SUBMIT', 'APPROVE', 'REJECT', 'RETURN_TO_DRAFT'] as JournalWorkflowAction[]) await journalWorkflowApi.action(company, journal, action, { version: 2, actionRequestId: id(99), ...(action === 'REJECT' ? { reason: '근거' } : {}) }, 'csrf-test')
+        for (const action of ['SUBMIT', 'APPROVE', 'REJECT', 'RETURN_TO_DRAFT', 'CONFIRM'] as JournalWorkflowAction[]) await journalWorkflowApi.action(company, journal, action, { version: 2, actionRequestId: id(99), ...(action === 'REJECT' ? { reason: '근거' } : {}) }, 'csrf-test')
         expect(calls.slice(0, 2).every(call => call.init.signal === controller.signal && call.method === 'GET' && !('X-CSRF-Token' in (call.init.headers ?? {})))).toBe(true)
         expect(calls[0].query.get('limit')).toBe('50'); expect(calls[0].query.get('status')).toBe('SUBMITTED'); expect(calls[0].query.get('from')).toBe('2026-01-01')
-        expect(writes().map(call => call.path.split('/').pop())).toEqual(['submit', 'approve', 'reject', 'return-to-draft'])
+        expect(writes().map(call => call.path.split('/').pop())).toEqual(['submit', 'approve', 'reject', 'return-to-draft', 'confirm'])
         expect(writes().every(call => call.init.credentials === 'include' && (call.init.headers as Record<string, string>)['X-CSRF-Token'] === 'csrf-test')).toBe(true)
         expect(writes()[2].body).toEqual({ version: 2, actionRequestId: id(99), reason: '근거' })
     })
@@ -95,6 +96,15 @@ describe('승인 화면 HTTP 계약과 역할', () => {
     })
     it('returns a rejected journal to draft only by explicit action', async () => {
         current = { ...current, status: 'REJECTED', version: 3 }; mount(); await choose(); fireEvent.change(screen.getByLabelText('승인 상태'), { target: { value: 'REJECTED' } }); fireEvent.click(screen.getByRole('button', { name: '조건 적용' })); fireEvent.click(await screen.findByRole('button', { name: '2026-1 · 가상 승인 적요 상세' })); await screen.findByRole('button', { name: '초안 복귀' }); expect(writes()).toHaveLength(0); fireEvent.click(screen.getByRole('button', { name: '초안 복귀' })); fireEvent.click(screen.getByRole('button', { name: '초안 복귀 확정' })); await screen.findByRole('heading', { name: '2026-1 · 초안' }); expect(writes()).toHaveLength(1); expect(writes()[0].body.version).toBe(3)
+    })
+    it('requires explicit immutable-ledger confirmation before posting APPROVED', async () => {
+        current = { ...current, status: 'APPROVED', version: 3 }; role = 'APPROVER'; mount(); await choose()
+        fireEvent.change(screen.getByLabelText('승인 상태'), { target: { value: 'APPROVED' } }); fireEvent.click(screen.getByRole('button', { name: '조건 적용' }))
+        fireEvent.click(await screen.findByRole('button', { name: '2026-1 · 가상 승인 적요 상세' })); await screen.findByRole('button', { name: '장부 반영' })
+        fireEvent.click(screen.getByRole('button', { name: '장부 반영' })); fireEvent.click(screen.getByRole('button', { name: '장부 반영 확정' }))
+        expect(screen.getByRole('alert').textContent).toContain('직접 수정할 수 없음을 확인'); expect(writes()).toHaveLength(0)
+        fireEvent.click(screen.getByLabelText('장부 반영과 원본 불변을 확인합니다')); fireEvent.click(screen.getByRole('button', { name: '장부 반영 확정' }))
+        await screen.findByRole('heading', { name: '2026-1 · 장부 반영' }); expect(writes()).toHaveLength(1); expect(writes()[0].path).toMatch(/\/confirm$/); expect(writes()[0].body.version).toBe(3)
     })
     it('keeps the same request ID for explicit unknown-result retry', async () => {
         let failed = false; override = call => call.path.endsWith('/approve') && !failed ? (failed = true, error(503)) : undefined

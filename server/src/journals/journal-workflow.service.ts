@@ -196,8 +196,8 @@ export class JournalWorkflowService {
       submission: { id: item.submission.id, content: item.submission.content,
         createdById: item.submission.createdById, createdAt: item.submission.createdAt.toISOString() } }))
     const roles = member.roles.map(item => item.role)
-    // [F05-01 단계 경계] CONFIRM HTTP 계약은 준비했지만 현재 승인 화면에는 다음 UI 묶음 전까지 노출하지 않는다.
-    const allowedActions = (Object.keys(workflowTransitions) as JournalWorkflowActionKind[]).filter(action => action !== 'CONFIRM' &&
+    // [F05 B4 확정 화면] 화면이 역할이나 상태를 추론하지 않도록 CONFIRM도 현재 DB 권한·본인 승인 설정을 통과한 경우에만 반환한다.
+    const allowedActions = (Object.keys(workflowTransitions) as JournalWorkflowActionKind[]).filter(action =>
       row.status === workflowTransitions[action].before && canPerform(roles, permission(action), {
         stateAllowed: true, userId, authorId: row.createdById, allowSelfApproval: member.company.allowSelfApproval }))
     return { journal: view(row), allowedActions, history: { items, nextCursor: rows.length > input.limit ? items.at(-1)!.id : null } }

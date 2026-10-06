@@ -1,5 +1,9 @@
 # 승인과 마감 및 정정 개발 문서
 
+APPROVED→POSTED 확정 화면 범위 확정(2026-10-07): 사용자가 [B1~B8](04-opening-ledger-browser-design.md)을 `확정`했다. 서버가 현재 허용한 CONFIRM만 화면에 노출하고 동일 요청 재확인·POSTED 불변·원장 갱신을 구현한다. 마감·마감 취소·정정은 후속이다.
+
+다음 화면 묶음 제안(2026-10-07): 사용자 `다음`에 따라 [APPROVED→POSTED 확정과 기초 잔액·원장 화면 B1~B8](04-opening-ledger-browser-design.md)을 준비했다. 현재 서버 권한 결과의 `CONFIRM` 노출과 화면 실행만 포함하고 기간 마감·마감 취소·정정 정책은 제외한다. 사용자 확정 전에는 코드·배포·완료 상태를 변경하지 않는다.
+
 기초 잔액 다음 범위 확정(2026-10-07): 사용자가 [O1~O8](04-opening-balance-foundation-design.md)에 `확정`으로 응답했다. OPENING 전표도 기존 DRAFT→SUBMITTED→APPROVED→POSTED, 역할 권한과 현재 본인 승인 설정을 그대로 적용해 구현·검증한다. 마감·정정 정책이나 완료 상태는 변경하지 않는다.
 
 POSTED 확정·원장 첫 서버 묶음 부분 완료(2026-10-07): 사용자가 `확정`(`IMPLEMENTATION_PLAN.md` 지정)한 [P1~P8](05-journal-posting-ledger-foundation-design.md)에 따라 APPROVED→POSTED 한 방향 전이·journal.confirm·불변 posting과 원장 대사를 구현·검증했다. 마감·정정·확정 화면·운영 배포는 후속이다.
