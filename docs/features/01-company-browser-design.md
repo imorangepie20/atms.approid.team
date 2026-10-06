@@ -14,7 +14,7 @@
 
 완료 조건은 (1) 최초 렌더의 네 값이 비어 있음, (2) 회사명·기간에 자동완성 차단과 고유 name 적용, (3) 재인증 비밀번호가 저장된 현재 자격증명을 자동 요청하지 않음, (4) 기존 등록·오류 초기화 E2E 통과, (5) build·lint·DOM·Appearance 전체 통과, (6) 배포 후 운영 DOM 속성과 빈 필드 확인이다.
 
-로컬 구현·검증 완료(2026-10-07): `CompanyCreateForm.tsx`에 form·회사명·시작일·종료일의 자동완성 차단과 고유 `name`, 재인증 필드의 `companyCreationPassword`/`new-password`를 적용했다. 관련 Playwright 13/13, DOM176/176, Appearance16/16, build/lint 종료0이다. 운영 DOM 속성과 실제 빈 필드는 배포 후 최종 확인한다.
+구현·배포 검증 완료(2026-10-07): `CompanyCreateForm.tsx`에 form·회사명·시작일·종료일의 자동완성 차단과 고유 `name`, 재인증 필드의 `companyCreationPassword`/`new-password`를 적용했다. 관련 Playwright 13/13, DOM176/176, Appearance16/16, build/lint 종료0이다. 커밋 `dd06805` 배포 후 운영 Chrome에서 네 필드 값이 모두 빈 문자열이고 회사/기간은 `autocomplete=off`, 비밀번호는 `autocomplete=new-password`, 네 `name`이 확정값과 일치함을 확인했다.
 
 [문서 인덱스](../README.md) · [회사 서버 기반](01-company-foundation-design.md) · [회사와 사용자 권한](01-company-access.md) · [구현 계획](../IMPLEMENTATION_PLAN.md)
 

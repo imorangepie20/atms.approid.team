@@ -2,7 +2,7 @@
 
 기초 잔액 첫 서버 묶음 부분 완료(2026-10-07): 사용자 `확정` 범위의 [O1~O8·API3개·구현19파일·K1~K8](features/04-opening-balance-foundation-design.md#전체-재검증-완료--2026-10-07)을 구현했다. 서버790·핵심91·DOM176·Appearance16과 schema/타입/build/lint를 통과했고 16 migration·기존139체크를 보존했다. 기초 잔액 화면·마감·정정·재무제표·세무 집계와 상위 F04/F05 완료는 후속이다.
 
-회사 등록 자동완성·Sidebar 간격 수리 로컬 완료(2026-10-07): 새 회사 폼은 브라우저 저장 자격증명을 요청하지 않고 빈 값으로 시작하며, 서브메뉴는 데스크톱 36px/38px·모바일 44px로 조정했다. 관련 브라우저13·Appearance16·DOM176과 build/lint를 통과했다. 전체 E2E 추가 점검에서 발견한 기존 증빙 미리보기 4실패는 [구현 계획](IMPLEMENTATION_PLAN.md)의 분리 기록을 따른다.
+회사 등록 자동완성·Sidebar 간격 수리 배포 완료(2026-10-07): 새 회사 폼은 브라우저 저장 자격증명을 요청하지 않고 빈 값으로 시작하며, 서브메뉴는 데스크톱 기본36px/38px·모바일44px로 조정했다. 관련 브라우저13·Appearance16·DOM176과 build/lint를 통과하고 커밋 `dd06805`의 운영 Chrome 실화면·DOM을 확인했다. 전체 E2E 추가 점검에서 발견한 기존 증빙 미리보기4실패는 [구현 계획](IMPLEMENTATION_PLAN.md)의 분리 기록을 따른다.
 
 POSTED 확정·원장 첫 서버 묶음 부분 완료(2026-10-07): 사용자가 `확정`(`IMPLEMENTATION_PLAN.md` 지정)한 [P1~P8·API3개·구현20파일·K1~K8](features/05-journal-posting-ledger-foundation-design.md)에 따라 APPROVED→POSTED·불변 posting·POSTED 전용 분개장/계정별 원장을 구현했다. 서버781·DOM176·Appearance16과 build/lint/schema/타입·격리 DB 검증을 통과했다. 기초 잔액·마감·정정·원장 화면·운영 배포와 F04/F05 전체 완료는 후속이다.
 

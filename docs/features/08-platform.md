@@ -6,7 +6,7 @@
 
 사용자가 구체 조정안을 듣고 “수정해”라고 확정했다. 모바일에서는 44px 조작 영역을 유지하고, `md` 이상에서 서브메뉴를 36px(`min-h-9`, `py-2`)로 줄인다. 항목 간격과 부모-첫 항목 간격은 2px(`space-y-0.5`, `mt-0.5`)로 줄이며 활성 상태·색상·들여쓰기·포커스·경로는 유지한다. 구현 파일은 `src/components/layout/Sidebar.tsx`, `tests/e2e/appearance.spec.ts`이고, 완료 기록은 이 문서와 `docs/IMPLEMENTATION_PLAN.md`에 남긴다. 검증 조건은 375px에서 44px 이상, 1440px에서 36px 높이와 38px 중심 간격, 메뉴 경로·키보드 포커스·활성 상태 보존, DOM/Appearance/build/lint 통과다.
 
-로컬 구현·검증 완료(2026-10-07): `mt-0.5`·`space-y-0.5`와 `md:min-h-9 md:py-2`를 적용했다. Playwright가 1440px에서 링크 높이 36px·중심 간격 38px, 375px에서 높이 44px 이상과 6개 경로를 확인했고 관련 13/13, Appearance16/16, DOM176/176, build/lint 종료0이다. 운영 실화면은 배포 뒤 확인한다.
+구현·배포 검증 완료(2026-10-07): `mt-0.5`·`space-y-0.5`와 `md:min-h-9 md:py-2`를 적용했다. Playwright가 기본 글자 크기의 1440px에서 링크 높이36px·중심 간격38px, 375px에서 높이44px 이상과 6개 경로를 확인했고 관련13/13, Appearance16/16, DOM176/176, build/lint 종료0이다. 커밋 `dd06805` 배포 후 운영 Chrome의 사용자 `compact` 글자 크기에서 6개 링크 높이31.5px·중심 간격33.25px로 축소된 실화면을 확인했다.
 
 [문서 인덱스](../README.md) · [전체 개요](../PROJECT_DECISIONS.md) · [개발 순서와 미정 사항](../ROADMAP.md)
 

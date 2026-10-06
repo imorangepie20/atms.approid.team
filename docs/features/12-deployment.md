@@ -1,5 +1,9 @@
 # 배포와 홈서버 운영 개발 문서
 
+기초 잔액·회사 폼·Sidebar 배포 완료(2026-10-07): 커밋 `dd06805`를 `origin/main`에 푸시하고 `/home/approid/atms.approid.team`에 반영했다. 외장 SSD `/mnt/external-ssd/backups/johae-server/atms/pre-dd06805-20261007`에 DB·웹·서버·인프라·API 이미지 백업을 만들고 SHA-256을 확인했다. 백업을 임시 DB로 복원한 뒤 15·16번째 migration을 적용해 16 migration·30테이블과 기존 27개 업무 테이블 지문 보존을 확인한 후 운영에 적용했다. API/app/PostgreSQL/ClamAV healthy, tunnel running, 내부·외부 ready와 `/companies` HTTP200, 미인증 기초 잔액 API401, 로컬/배포 web index SHA-256 `723c03734bde3bfd7cacc4351a4ea1bd01f061f87f5f5866c997b2434e360ae7` 일치다. Chrome 운영 화면에서 회사 등록 4필드가 비어 있고 `autocomplete`/`name` 속성이 확정값과 일치하며 서브메뉴 간격이 줄어든 것을 확인했다.
+
+첫 두 사전 점검은 운영 적용 전 기존 migration 줄바꿈 체크섬 차이에서 중단했고, 세 번째 준비 점검은 격리 DB의 새 열 때문에 전체 JSON 지문이 달라져 운영 적용 전 중단했다. 기존 SQL의 정규화 내용 동일성을 확인하고 이미 적용된 운영 migration 바이트를 보존했으며, 기존 열만 비교하도록 지문 범위를 바로잡은 뒤 백업·복원·격리 적용·운영 적용 전체를 다시 통과했다. 어느 중단에서도 운영 DB나 컨테이너를 변경하지 않았다.
+
 승인 화면/서버 후속 배포 부분 완료(2026-10-07): 사용자 “확정”(api.ts 지정)에 따라 [A1~A8](05-approval-browser-design.md)의 운영 SSD 백업·격리 DB 복원 시험·승인 SQL/API/정적 화면·가상 회사 실제 브라우저 검증을 마쳤다. [최종 K1~K8](../../.artifacts/implementation-f05-approval-browser/results.json)은 모두 PASS다. 완료 migration14·테이블29, 기존 업무25테이블 행 지문 보존, 공개 ready/승인 화면 HTTP200·미인증 승인 API401·빌드와 배포 index SHA-256 일치를 확인했다. 전체 F12 완료 체크는 후속 범위의 운영 검증을 기다린다.
 
 [문서 인덱스](../README.md) · [전체 개요](../PROJECT_DECISIONS.md) · [개발 순서와 미정 사항](../ROADMAP.md)
