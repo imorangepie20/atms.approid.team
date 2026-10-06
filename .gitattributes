@@ -1,9 +1,7 @@
 # Prisma records migration checksums byte-for-byte. Keep SQL stable across Windows and Linux.
 server/prisma/migrations/**/*.sql text eol=lf
-# These three migrations were originally applied with CRLF; Prisma stores their byte checksums.
-server/prisma/migrations/20261005010000_business_foundation/migration.sql text eol=crlf
-server/prisma/migrations/20261005020000_auth_audit_foundation/migration.sql text eol=crlf
-server/prisma/migrations/20261005040000_company_foundation/migration.sql text eol=crlf
+# Some legacy production migrations were applied with mixed line endings. Deployments must retain
+# those already-applied bytes after proving the normalized SQL content is identical.
 
 # These files execute in Linux containers or on the home server.
 *.sh text eol=lf
