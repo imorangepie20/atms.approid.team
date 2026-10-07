@@ -1,5 +1,7 @@
 # 배포와 홈서버 운영 개발 문서
 
+기초 잔액·확정·원장 화면 배포 완료(2026-10-07): 최초 릴리스 `ec4ebc7-ledger-ui` 뒤 실제 운영 검증에서 확인한 POSTED 안내 문구를 사용자 추가 확정에 따라 수리하고 `ec4ebc7-ledger-ui-copyfix`로 재배포했다. 외장 SSD `pre-ec4ebc7-ledger-ui-copyfix`의 DB·웹·서버·API 이미지 백업 SHA-256과 임시 DB 복원을 확인했으며, 가상 검증 자료를 포함한 28개 업무 테이블 행 지문 `aa8532a23be6ef83d4a817a4648bb164505a2fa63a0d45a4313052eeab59ac6f`가 적용 전후 일치했다. 16 migration·30테이블, 모든 서비스 healthy/tunnel running, 외부 ready와 `/accounting/ledger` HTTP200, 미인증 원장 API401, 배포 Playwright12/12와 로컬/배포 index SHA-256 `eff228f33a22a619f655ba036d9871eee4af9f62a19fb57c936b27a438a0e4fe` 일치를 확인했다. 실제 가상 회사의 0원/비영 기초·일반전표·분개장·계정별 원장·PDF 원본 UI/API/DB 대조도 통과했다.
+
 기초 잔액·회사 폼·Sidebar 배포 완료(2026-10-07): 커밋 `dd06805`를 `origin/main`에 푸시하고 `/home/approid/atms.approid.team`에 반영했다. 외장 SSD `/mnt/external-ssd/backups/johae-server/atms/pre-dd06805-20261007`에 DB·웹·서버·인프라·API 이미지 백업을 만들고 SHA-256을 확인했다. 백업을 임시 DB로 복원한 뒤 15·16번째 migration을 적용해 16 migration·30테이블과 기존 27개 업무 테이블 지문 보존을 확인한 후 운영에 적용했다. API/app/PostgreSQL/ClamAV healthy, tunnel running, 내부·외부 ready와 `/companies` HTTP200, 미인증 기초 잔액 API401, 로컬/배포 web index SHA-256 `723c03734bde3bfd7cacc4351a4ea1bd01f061f87f5f5866c997b2434e360ae7` 일치다. Chrome 운영 화면에서 회사 등록 4필드가 비어 있고 `autocomplete`/`name` 속성이 확정값과 일치하며 서브메뉴 간격이 줄어든 것을 확인했다.
 
 첫 두 사전 점검은 운영 적용 전 기존 migration 줄바꿈 체크섬 차이에서 중단했고, 세 번째 준비 점검은 격리 DB의 새 열 때문에 전체 JSON 지문이 달라져 운영 적용 전 중단했다. 기존 SQL의 정규화 내용 동일성을 확인하고 이미 적용된 운영 migration 바이트를 보존했으며, 기존 열만 비교하도록 지문 범위를 바로잡은 뒤 백업·복원·격리 적용·운영 적용 전체를 다시 통과했다. 어느 중단에서도 운영 DB나 컨테이너를 변경하지 않았다.

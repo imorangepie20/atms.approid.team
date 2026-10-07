@@ -87,3 +87,15 @@ B8의 운영 적용과 가상 회사·자료 생성은 새 선택이다. 직전 
 ## 사용자 확정 기록
 
 2026-10-07 사용자가 이 구체적 제안에 `확정`(`docs/IMPLEMENTATION_PLAN.md` 지정)으로 응답했다. 확정값은 B1~B8 전체, 기존 API 6개, 구현 파일 20개, K1~K8, 홈서버 API/웹 반영과 분리된 가상 검증 자료 생성이다. 영향 작업 ID는 F04-02·05·08·09·10, F05-01·03·07, F08-09·13·14·15, F12다.
+
+## 로컬·홈서버·실제 업무 시나리오 검증 완료 — 2026-10-07
+
+구현 코드는 커밋 `ec4ebc7`에 반영됐다. 첫 로컬 서버 전체 검증은 34파일 중 30파일·701시험이 통과하고, 각 파일이 프로세스 전역 `DATABASE_URL`을 바꾸는 인증·회사 통합시험 4파일이 동시에 migration을 준비하면서 실패했다. 직전 기초 잔액 검증에서 확인한 실행 경계에 따라 `npm test -- --maxWorkers=1`로 바꾸고 서버·DOM·브라우저·Appearance·build·lint 전체 묶음을 다시 실행했다.
+
+재검증 결과는 서버 34파일·791/791, DOM 2파일·23/23, 로컬 Playwright 25/25, 배포 Playwright 12/12, Appearance 16/16, 웹/API build와 lint 종료0이다. lint에는 이번 범위 밖 `src/pages/ui/UiIcons.tsx`의 기존 미사용 disable 경고 1개가 남지만 오류는 0개다.
+
+첫 홈서버 릴리스 `ec4ebc7-ledger-ui`는 적용 전 외장 SSD 백업 4종의 SHA-256과 임시 DB 복원을 확인하고 28개 업무 테이블 행 지문을 보존했다. 실제 운영 검증에서 POSTED 전표 상세의 기존 공통 안내가 반대 의미로 표시되는 문제를 발견했다. 승인된 20개 파일 밖 `src/components/journals/JournalDetail.tsx` 한 파일을 조건 분기로 고치는 안을 제시했고, 사용자가 2026-10-07 `검증해`(`docs/IMPLEMENTATION_PLAN.md` 지정)로 추가 범위·재배포·전체 재검증을 확정했다.
+
+수리 뒤 전체 묶음을 다시 실행해 서버 34파일·791/791, DOM 2파일·23/23, 로컬 Playwright 25/25, 배포 Playwright 12/12, Appearance 16/16, 웹/API build와 lint 종료0을 확인했다. lint에는 범위 밖 `src/pages/ui/UiIcons.tsx`의 기존 미사용 disable 경고 1개가 남지만 오류는 0개다. 새 릴리스 `ec4ebc7-ledger-ui-copyfix`의 외장 SSD 백업과 임시 DB 복원, 28개 업무 테이블 전후 지문 `aa8532a23be6ef83d4a817a4648bb164505a2fa63a0d45a4313052eeab59ac6f`, 16 migration·30테이블, API healthy, 외부 ready 200, `/accounting/ledger` 200, 미인증 원장 API401, 로컬/배포 index SHA-256 `eff228f33a22a619f655ba036d9871eee4af9f62a19fb57c936b27a438a0e4fe` 일치를 확인했다.
+
+분리된 가상 회사에서 `20260101-000003` 0원 기초와 `20270101-000001` 비영 기초, 일반전표 `20260101-000002`를 UI로 SUBMIT→APPROVE→CONFIRM하여 POSTED v4로 만들었다. 분개장은 POSTED 4행·차변/대변 각 3,000원·순액0원, 99101 계정 원장은 2026년 CONFIRMED_ZERO·당기 차변/기말 2,000원과 2027년 POSTED 기초/기말 1,000원을 UI/API/DB에서 동일하게 반환했다. 연결 PDF 원본은 HTTP200·application/pdf·619바이트·1페이지 렌더링을 확인했다. [실제 시나리오](../../.artifacts/implementation-f04-ledger-browser/live-scenario.json)와 [K1~K8 결과](../../.artifacts/implementation-f04-ledger-browser/completion-evidence.json)는 모두 PASS이고 미검증 항목은 없다. 이 묶음은 완료하며 마감·정정·재무제표·세무 집계를 포함하는 F04/F05/F12 상위 체크는 유지한다.

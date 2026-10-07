@@ -1,5 +1,7 @@
 # ATMS 구현 계획서 및 체크리스트
 
+기초 잔액·확정·원장 화면 묶음 완료(2026-10-07): 확정한 [B1~B8·API6개·구현20파일·K1~K8](features/04-opening-ledger-browser-design.md)의 코드와 사용자가 `검증해`로 추가 확정한 `JournalDetail.tsx`의 POSTED 안내 수리를 검증했다. 최종 로컬 서버791·DOM23·Playwright25·Appearance16, build/lint와 배포 Playwright12가 통과했다. 홈서버 릴리스 `ec4ebc7-ledger-ui-copyfix`는 SSD 백업·임시 DB 복원·28개 업무 테이블 지문 `aa8532a23be6ef83d4a817a4648bb164505a2fa63a0d45a4313052eeab59ac6f` 전후 일치·16 migration/30테이블·HTTPS와 로컬/배포 index SHA-256 일치를 통과했다. 분리된 가상 회사의 2026년 0원 기초, 2027년 비영 기초, 일반 전표를 POSTED로 확정하고 분개장·계정별 원장·PDF 원본을 UI/API/DB로 대조했다. [K1~K8 결과](../.artifacts/implementation-f04-ledger-browser/completion-evidence.json)는 전부 PASS이고 미검증 항목은 없다. 마감·정정·재무제표·세무 집계가 남아 F04/F05/F12 상위 체크는 유지한다.
+
 기초 잔액·확정·원장 화면 묶음 확정(2026-10-07): 직전 [B1~B8·기존 API6개·구현20파일·K1~K8·홈서버 반영](features/04-opening-ledger-browser-design.md) 제시 후 사용자가 `확정`(`IMPLEMENTATION_PLAN.md` 지정)으로 전체를 선택했다. F04-02·05·08·09·10/F05-01·03·07/F08-09·13·14·15/F12의 승인된 화면·최소 서버 경계·배포 범위를 구현한다. 마감·정정·재무제표·세무 집계와 상위 체크는 유지한다.
 
 다음 화면 묶음 제안(2026-10-07): 사용자 `다음`(`IMPLEMENTATION_PLAN.md` 지정)에 따라 [기초 잔액·전표 확정·분개장/계정별 원장 화면과 홈서버 반영 B1~B8](features/04-opening-ledger-browser-design.md)을 준비했다. 기존 API6개·구현20파일·K1~K8이며 사용자 확정 대기다. 마감·정정·재무제표·세무 집계는 제외하고 코드/DB/배포/업무 체크는 변경하지 않는다.

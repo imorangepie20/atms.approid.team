@@ -1,5 +1,7 @@
 # ATMS 개발 문서 인덱스
 
+기초 잔액·확정·원장 화면 묶음 완료(2026-10-07): [B1~B8 구현과 운영 검증](features/04-opening-ledger-browser-design.md)은 서버791·DOM23·로컬 Playwright25·배포 Playwright12·Appearance16과 build/lint를 통과했다. 홈서버 `ec4ebc7-ledger-ui-copyfix`의 SSD 백업·임시 DB 복원, 28개 업무 테이블 지문 보존, 16 migration·30테이블, HTTPS와 빌드/배포 index SHA-256 일치를 확인했다. 분리된 가상 회사의 0원/비영 기초 잔액·일반 전표·분개장·계정별 원장·PDF 원본을 UI/API/DB로 대조해 K1~K8을 모두 통과했다. 마감·정정·재무제표·세무 집계가 남아 F04/F05/F12 상위 체크는 유지한다.
+
 기초 잔액 첫 서버 묶음 부분 완료(2026-10-07): 사용자 `확정` 범위의 [O1~O8·API3개·구현19파일·K1~K8](features/04-opening-balance-foundation-design.md#전체-재검증-완료--2026-10-07)을 구현했다. 서버790·핵심91·DOM176·Appearance16과 schema/타입/build/lint를 통과했고 16 migration·기존139체크를 보존했다. 기초 잔액 화면·마감·정정·재무제표·세무 집계와 상위 F04/F05 완료는 후속이다.
 
 회사 등록 자동완성·Sidebar 간격 수리 배포 완료(2026-10-07): 새 회사 폼은 브라우저 저장 자격증명을 요청하지 않고 빈 값으로 시작하며, 서브메뉴는 데스크톱 기본36px/38px·모바일44px로 조정했다. 관련 브라우저13·Appearance16·DOM176과 build/lint를 통과하고 커밋 `dd06805`의 운영 Chrome 실화면·DOM을 확인했다. 전체 E2E 추가 점검에서 발견한 기존 증빙 미리보기4실패는 [구현 계획](IMPLEMENTATION_PLAN.md)의 분리 기록을 따른다.
